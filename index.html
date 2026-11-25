@@ -10,270 +10,491 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: 터미널형 3단 그리드 — 왼쪽 도구 막대 · 가운데 차트(가격+RSI) · 오른쪽 관심종목, 모바일에서는 세로로 쌓임 */
+/* Layout: 차트 터미널 — 상단 툴바 / 왼쪽 그리기 도구 · 가운데 차트(+지표 창) · 오른쪽 패널 · 맨 오른쪽 아이콘 막대 / 하단 기간 막대 */
 :root {
-  --bg:#eef0f4; --panel:#ffffff; --line:#dde1e8; --grid:#f0f2f6; --fg:#141821; --muted:#687186; --hover:#f1f4f9;
-  --accent:#2f6bff; --up:#0f9d74; --down:#dc3f49;
-  --c-ma20:#e8a317; --c-ma50:#7b5cff; --c-ema:#e0459b; --c-bb:#2aa1c9;
+  --bg:#e8ebf0; --panel:#ffffff; --line:#e0e3ea; --grid:#f1f3f6; --fg:#161a23; --muted:#697086; --hover:#f0f2f7; --active:#e4ebff;
+  --accent:#2f6bff; --up:#0f9d74; --down:#dc3f49; --warn:#d9820b; --on-color:#ffffff;
+  --i0:#e8a317; --i1:#7b5cff; --i2:#e0459b; --i3:#1f9fcf; --i4:#3fa34d; --i5:#ff7a29;
+  --shadow:0 10px 30px rgba(20,24,35,.16), 0 2px 6px rgba(20,24,35,.08); --backdrop:rgba(12,15,22,.42);
   --sans:"Inter", system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg:#0b0e14; --panel:#131720; --line:#222837; --grid:#181d28; --fg:#e4e8f0; --muted:#8891a5; --hover:#1b2130;
-  --accent:#5b8cff; --up:#21bf8d; --down:#f0565f;
-  --c-ma20:#f0b232; --c-ma50:#9a82ff; --c-ema:#f062b0; --c-bb:#3fb6de; color-scheme:dark;
+  --bg:#06080c; --panel:#11141b; --line:#232836; --grid:#171b24; --fg:#e3e7ef; --muted:#878fa3; --hover:#1a1f2a; --active:#1a2747;
+  --accent:#5b8cff; --up:#21bf8d; --down:#f0565f; --warn:#f2a93b; --on-color:#ffffff;
+  --i0:#f0b232; --i1:#9a82ff; --i2:#f062b0; --i3:#3fb6de; --i4:#5cc46a; --i5:#ff9450;
+  --shadow:0 10px 30px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.3); --backdrop:rgba(0,0,0,.55); color-scheme:dark;
 }}
 :root[data-theme="dark"] {
-  --bg:#0b0e14; --panel:#131720; --line:#222837; --grid:#181d28; --fg:#e4e8f0; --muted:#8891a5; --hover:#1b2130;
-  --accent:#5b8cff; --up:#21bf8d; --down:#f0565f;
-  --c-ma20:#f0b232; --c-ma50:#9a82ff; --c-ema:#f062b0; --c-bb:#3fb6de; color-scheme:dark;
+  --bg:#06080c; --panel:#11141b; --line:#232836; --grid:#171b24; --fg:#e3e7ef; --muted:#878fa3; --hover:#1a1f2a; --active:#1a2747;
+  --accent:#5b8cff; --up:#21bf8d; --down:#f0565f; --warn:#f2a93b; --on-color:#ffffff;
+  --i0:#f0b232; --i1:#9a82ff; --i2:#f062b0; --i3:#3fb6de; --i4:#5cc46a; --i5:#ff9450;
+  --shadow:0 10px 30px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.3); --backdrop:rgba(0,0,0,.55); color-scheme:dark;
 }
 * { box-sizing:border-box; }
+[hidden] { display:none !important; }
 html, body { height:100%; }
 body {
   margin:0; background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:13px; overflow:hidden;
-  padding-block:8px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:6px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px));
 }
-button, select { font:inherit; color:inherit; }
-button:focus-visible, select:focus-visible, .row:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+button, select, input { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .num { font-family:var(--mono); font-variant-numeric:tabular-nums; }
-
-.app {
-  height:100%; display:grid; gap:6px;
-  grid-template-columns:44px minmax(0,1fr) 290px;
-  grid-template-rows:auto minmax(0,1fr) auto;
-  grid-template-areas:"top top top" "tools main side" "foot foot foot";
-}
+.up { color:var(--up); } .down { color:var(--down); }
 .panel { background:var(--panel); border:1px solid var(--line); border-radius:6px; }
 
-/* 상단 바 */
-.top { grid-area:top; display:flex; align-items:center; gap:10px; padding:6px 10px; flex-wrap:wrap; }
-.brand { display:flex; align-items:center; gap:7px; font-weight:700; letter-spacing:.01em; padding-right:6px; border-right:1px solid var(--line); }
-.brand svg { display:block; }
-.sym-select { background:var(--hover); border:1px solid var(--line); border-radius:5px; padding:5px 8px; font-weight:600; cursor:pointer; }
-.quote { display:flex; align-items:baseline; gap:8px; }
-.quote .last { font-size:16px; font-weight:600; }
-.quote .chg { font-size:12px; }
-.sep { width:1px; align-self:stretch; background:var(--line); }
-.seg { display:flex; gap:2px; overflow-x:auto; scrollbar-width:none; }
-.seg::-webkit-scrollbar { display:none; }
-.seg button, .chip {
-  background:transparent; border:1px solid transparent; border-radius:5px; padding:5px 8px; cursor:pointer; white-space:nowrap; color:var(--muted); font-weight:500;
+.app {
+  height:100%; display:grid; gap:4px;
+  grid-template-columns:44px minmax(0,1fr) var(--side, 330px) 44px;
+  grid-template-rows:42px minmax(0,1fr) 32px;
+  grid-template-areas:"top top top top" "tools chart side strip" "tools bottom side strip";
 }
-.seg button:hover, .chip:hover { background:var(--hover); color:var(--fg); }
-.seg button[aria-pressed="true"] { color:var(--accent); background:var(--hover); }
-.chip[aria-pressed="true"] { color:var(--fg); border-color:var(--line); background:var(--hover); }
-.chip i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:0; }
-.type-select { background:transparent; border:1px solid var(--line); border-radius:5px; padding:4px 6px; cursor:pointer; }
+.app.side-closed { --side:0px; column-gap:4px; }
+.app.side-closed .side { display:none; }
 
-/* 왼쪽 도구 */
-.tools { grid-area:tools; display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 0; }
-.tools button { width:32px; height:32px; display:grid; place-items:center; border:0; border-radius:5px; background:transparent; color:var(--muted); cursor:pointer; }
-.tools button:hover { background:var(--hover); color:var(--fg); }
-.tools button[aria-pressed="true"] { background:var(--hover); color:var(--accent); }
-.tools .div { width:22px; height:1px; background:var(--line); margin:4px 0; }
+/* 공통 툴바 버튼 */
+.tb {
+  height:32px; min-width:32px; padding:0 8px; border:0; border-radius:4px; background:transparent; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; flex:none; color:var(--fg);
+}
+.tb:hover { background:var(--hover); }
+.tb[aria-pressed="true"], .tb[aria-expanded="true"] { background:var(--active); color:var(--accent); }
+.tb:disabled { opacity:.35; cursor:default; background:transparent; }
+.tb svg { flex:none; }
+.vsep { width:1px; height:20px; background:var(--line); margin:0 4px; flex:none; }
+.hsep { width:24px; height:1px; background:var(--line); margin:4px 0; flex:none; }
 
-/* 차트 */
-.main { grid-area:main; display:flex; flex-direction:column; min-width:0; overflow:hidden; position:relative; }
-.chart-wrap { position:relative; flex:1 1 auto; min-height:0; }
-#chart, #rsi { position:absolute; inset:0; }
-.rsi-wrap { position:relative; flex:0 0 24%; border-top:1px solid var(--line); min-height:90px; }
-.legend { position:absolute; top:8px; left:10px; z-index:5; pointer-events:none; display:flex; flex-direction:column; gap:3px; font-size:12px; line-height:1.35; max-width:calc(100% - 90px); }
-.legend .l1 { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; }
-.legend .title { font-weight:600; font-size:13px; }
-.legend .k { color:var(--muted); margin-right:2px; }
-.legend .ind { display:flex; flex-wrap:wrap; gap:2px 10px; color:var(--muted); }
-.rsi-label { position:absolute; top:6px; left:10px; z-index:5; pointer-events:none; font-size:12px; color:var(--muted); }
-.hint { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:6; background:var(--fg); color:var(--panel); padding:6px 12px; border-radius:5px; font-size:12px; pointer-events:none; }
+.top { grid-area:top; display:flex; align-items:center; gap:2px; padding:0 6px; overflow-x:auto; scrollbar-width:none; }
+.top::-webkit-scrollbar { display:none; }
+.top .sym-btn { font-weight:700; font-size:14px; padding:0 10px; }
+.top .sym-btn svg { color:var(--muted); }
+.top .spacer { flex:1 0 8px; }
+.top .tf-btn { font-weight:600; min-width:44px; }
 
-/* 관심종목 */
+.tools { grid-area:tools; display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 0; overflow-y:auto; scrollbar-width:none; }
+.tools .tb { width:34px; height:34px; padding:0; }
+
+.strip { grid-area:strip; display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 0; }
+.strip .tb { width:34px; height:34px; padding:0; }
+
+/* 차트 영역 */
+.chartcol { grid-area:chart; display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+.wrap { position:relative; flex:1 1 auto; min-height:140px; touch-action:none; }
+#chart { position:absolute; inset:0; }
+#draw { position:absolute; inset:0; pointer-events:none; z-index:3; }
+.pane { position:relative; flex:none; border-top:1px solid var(--line); }
+.pane-chart { position:absolute; inset:0; }
+.grip { position:absolute; left:0; right:0; top:-5px; height:9px; cursor:row-resize; z-index:6; touch-action:none; }
+.grip:hover::after { content:""; position:absolute; left:0; right:0; top:4px; height:1px; background:var(--accent); }
+
+.legend { position:absolute; top:6px; left:8px; z-index:5; pointer-events:none; display:flex; flex-direction:column; align-items:flex-start; gap:1px; font-size:12px; line-height:20px; max-width:calc(100% - 96px); }
+.lhead { display:flex; flex-wrap:wrap; align-items:center; gap:0 8px; }
+.ltitle { font-weight:600; font-size:13.5px; }
+.sim { font-size:10px; font-weight:700; letter-spacing:.04em; color:var(--warn); border:1px solid currentColor; border-radius:3px; padding:0 4px; line-height:15px; }
+.lohlc { display:flex; flex-wrap:wrap; gap:0 8px; }
+.lohlc .k { color:var(--muted); margin-right:3px; font-family:var(--sans); }
+.lcollapse { pointer-events:auto; width:20px; height:20px; border:0; border-radius:3px; background:transparent; color:var(--muted); cursor:pointer; display:grid; place-items:center; }
+.lcollapse:hover { background:var(--hover); }
+.legend.collapsed .lrow { display:none; }
+.legend.collapsed .lcollapse svg { transform:rotate(-90deg); }
+.lrow { pointer-events:auto; display:flex; align-items:center; gap:6px; padding:0 4px; margin-left:-4px; border-radius:4px; max-width:100%; }
+.lrow:hover { background:var(--hover); }
+.lname { white-space:nowrap; }
+.lvals { display:flex; flex-wrap:wrap; gap:0 6px; }
+.lbtns { display:none; gap:1px; }
+.lrow:hover .lbtns, .lrow:focus-within .lbtns { display:inline-flex; }
+@media (hover:none) { .lbtns { display:inline-flex; } }
+.lbtns button { width:22px; height:20px; border:0; border-radius:3px; background:transparent; color:var(--muted); cursor:pointer; display:grid; place-items:center; }
+.lbtns button:hover { background:var(--panel); color:var(--fg); }
+.lrow.off .lname, .lrow.off .lvals { opacity:.4; }
+
+.drawbar { position:absolute; top:34px; right:96px; z-index:7; display:flex; align-items:center; gap:4px; padding:4px; background:var(--panel); border:1px solid var(--line); border-radius:6px; box-shadow:var(--shadow); }
+.swatch { width:22px; height:22px; border-radius:50%; border:2px solid var(--panel); box-shadow:0 0 0 1px var(--line); cursor:pointer; padding:0; }
+.swatch[aria-pressed="true"] { box-shadow:0 0 0 2px var(--fg); }
+.hint { position:absolute; left:50%; bottom:40px; transform:translateX(-50%); z-index:7; background:var(--fg); color:var(--panel); padding:5px 12px; border-radius:4px; font-size:12px; pointer-events:none; white-space:nowrap; }
+
+.bottom { grid-area:bottom; display:flex; align-items:center; gap:1px; padding:0 6px; overflow-x:auto; scrollbar-width:none; }
+.bottom::-webkit-scrollbar { display:none; }
+.bottom .tb { height:24px; min-width:0; padding:0 7px; font-size:12px; color:var(--muted); }
+.bottom .tb:hover { color:var(--fg); }
+.bottom .tb[aria-pressed="true"] { color:var(--accent); }
+.bottom .clock { font-size:12px; color:var(--muted); padding:0 6px; white-space:nowrap; }
+
+/* 오른쪽 패널 */
 .side { grid-area:side; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
-.side h2 { margin:0; padding:10px 12px 8px; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; display:flex; justify-content:space-between; }
-.wl-head, .row { display:grid; grid-template-columns:minmax(0,1fr) auto 68px; gap:8px; padding:0 12px; align-items:center; }
-.wl-head { font-size:11px; color:var(--muted); padding-bottom:6px; border-bottom:1px solid var(--line); }
-.wl-head span:not(:first-child), .row .num { text-align:right; }
-.list { overflow-y:auto; flex:1 1 auto; }
-.row { padding-block:8px; cursor:pointer; border-bottom:1px solid var(--grid); }
-.row:hover { background:var(--hover); }
-.row[aria-current="true"] { background:var(--hover); box-shadow:inset 2px 0 0 var(--accent); }
-.row .s { font-weight:600; }
-.row .n { color:var(--muted); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.row .p { transition:color .5s; }
-.row .p.flash-up { color:var(--up); transition:none; }
-.row .p.flash-down { color:var(--down); transition:none; }
-.up { color:var(--up); } .down { color:var(--down); }
-.detail { border-top:1px solid var(--line); padding:10px 12px; display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:12px; }
-.detail dt { color:var(--muted); } .detail dd { margin:0; text-align:right; }
+.ptabs { display:flex; gap:4px; padding:0 8px; border-bottom:1px solid var(--line); flex:none; }
+.ptabs button { border:0; background:transparent; padding:10px 6px 8px; color:var(--muted); font-weight:600; cursor:pointer; border-bottom:2px solid transparent; }
+.ptabs button[aria-selected="true"] { color:var(--fg); border-bottom-color:var(--accent); }
+.psec { display:flex; flex-direction:column; min-height:0; flex:1 1 auto; }
+.wl-head, .wrow { display:grid; grid-template-columns:minmax(0,1fr) 74px 54px 56px; gap:5px; align-items:center; padding:0 10px; }
+.wl-head { font-size:11px; color:var(--muted); padding-block:6px; border-bottom:1px solid var(--line); flex:none; }
+.wl-head span:not(:first-child), .wrow .num { text-align:right; }
+.wlist { overflow-y:auto; flex:1 1 auto; min-height:80px; }
+.wrow { padding-block:6px; cursor:pointer; border:0; width:100%; background:transparent; text-align:left; font-size:12.5px; }
+.wrow:hover { background:var(--hover); }
+.wrow[aria-current="true"] { background:var(--active); }
+.wrow .s { font-weight:600; display:flex; align-items:center; gap:6px; min-width:0; }
+.wrow .s span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wrow .badge { flex:none; width:16px; height:16px; border-radius:50%; display:grid; place-items:center; font-size:9px; font-weight:700; color:var(--on-color); }
+.wrow .p { transition:background-color .6s; border-radius:3px; padding:0 2px; }
+.wrow .p.fu { background:color-mix(in srgb, var(--up) 28%, transparent); transition:none; }
+.wrow .p.fd { background:color-mix(in srgb, var(--down) 28%, transparent); transition:none; }
 
-.foot { grid-area:foot; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:11px; padding:0 4px; }
-.foot .sim { color:var(--down); font-weight:600; }
+.det { border-top:1px solid var(--line); padding:12px; display:flex; flex-direction:column; gap:10px; flex:none; }
+.det-top { display:flex; align-items:center; gap:8px; }
+.det-top b { font-size:14px; }
+.det-ex { font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:3px; padding:0 4px; }
+.det-name { color:var(--muted); font-size:12px; margin-top:-6px; }
+.det-price { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.det-price .big { font-size:24px; font-weight:600; }
+.rng { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); }
+.rng-bar { position:relative; height:4px; border-radius:2px; background:var(--line); }
+.rng-bar i { position:absolute; top:-3px; width:10px; height:10px; margin-left:-5px; border-radius:50%; background:var(--fg); border:2px solid var(--panel); }
+.rng-lbl { display:flex; justify-content:space-between; color:var(--fg); }
+.stats { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:0; font-size:12px; }
+.stats dt { color:var(--muted); } .stats dd { margin:0; text-align:right; }
+
+.alform { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:12px; border-bottom:1px solid var(--line); flex:none; }
+.alform label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); }
+.alform .full { grid-column:1 / -1; }
+.alform select, .alform input { height:32px; border:1px solid var(--line); border-radius:4px; background:var(--panel); padding:0 8px; width:100%; min-width:0; }
+.btn-primary { height:34px; border:0; border-radius:4px; background:var(--accent); color:var(--on-color); font-weight:600; cursor:pointer; }
+.btn-primary:hover { filter:brightness(1.08); }
+.allist { overflow-y:auto; flex:1 1 auto; }
+.alrow { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; padding:8px 12px; border-bottom:1px solid var(--grid); align-items:center; }
+.alrow .t { font-weight:600; }
+.alrow .m { grid-column:1; font-size:11px; color:var(--muted); }
+.alrow .st { font-size:11px; }
+.alrow .st.fired { color:var(--warn); font-weight:600; }
+.alrow button { grid-row:1 / span 2; grid-column:2; }
+.empty { padding:16px 12px; color:var(--muted); font-size:12px; line-height:1.55; }
+
+/* 메뉴·모달·토스트 */
+.menu { position:fixed; z-index:40; min-width:190px; max-height:70vh; overflow-y:auto; padding:4px; background:var(--panel); border:1px solid var(--line); border-radius:6px; box-shadow:var(--shadow); }
+.mg { font-size:11px; color:var(--muted); padding:8px 10px 3px; letter-spacing:.04em; }
+.mi { display:flex; align-items:center; gap:10px; width:100%; padding:7px 10px; border:0; border-radius:4px; background:transparent; cursor:pointer; text-align:left; }
+.mi:hover, .mi:focus-visible { background:var(--hover); }
+.mi[aria-checked="true"] { color:var(--accent); background:var(--active); }
+.mi .sc { margin-left:auto; color:var(--muted); font-size:11px; }
+
+.back { position:fixed; inset:0; z-index:50; background:var(--backdrop); display:flex; justify-content:center; align-items:flex-start; padding:8vh max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); }
+.modal { width:min(600px, 100%); max-height:78vh; display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); overflow:hidden; }
+.mhead { display:flex; align-items:center; justify-content:space-between; padding:12px 12px 8px 16px; }
+.mhead h3 { margin:0; font-size:16px; font-weight:600; }
+.msearch { display:flex; align-items:center; gap:8px; margin:0 16px 8px; padding:0 10px; height:38px; border:1px solid var(--line); border-radius:6px; color:var(--muted); }
+.msearch:focus-within { border-color:var(--accent); }
+.msearch input { flex:1; border:0; outline:0; background:transparent; height:100%; color:var(--fg); font-size:14px; min-width:0; }
+.mtabs { display:flex; gap:4px; padding:0 16px 8px; overflow-x:auto; border-bottom:1px solid var(--line); flex:none; scrollbar-width:none; }
+.mtabs button { border:1px solid var(--line); background:transparent; border-radius:14px; padding:3px 12px; cursor:pointer; white-space:nowrap; color:var(--muted); }
+.mtabs button[aria-pressed="true"] { background:var(--fg); color:var(--panel); border-color:var(--fg); }
+.mlist { overflow-y:auto; flex:1 1 auto; padding:4px 0; }
+.mrow { display:grid; grid-template-columns:24px 96px minmax(0,1fr) auto; gap:10px; align-items:center; width:100%; padding:8px 16px; border:0; background:transparent; cursor:pointer; text-align:left; }
+.mrow:hover, .mrow.active { background:var(--hover); }
+.mrow b { font-size:13px; } .mrow .d { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .mrow .x { color:var(--muted); font-size:11px; }
+.mrow.ind { grid-template-columns:minmax(0,1fr) auto; }
+.mrow.ind .d { font-size:12px; }
+.mrow .cnt { font-size:11px; color:var(--accent); }
+
+.pop { position:fixed; z-index:45; width:240px; padding:12px; background:var(--panel); border:1px solid var(--line); border-radius:6px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:10px; }
+.pop h4 { margin:0; font-size:13px; }
+.pop label { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12px; color:var(--muted); }
+.pop input { width:84px; height:30px; border:1px solid var(--line); border-radius:4px; background:var(--panel); padding:0 8px; text-align:right; }
+.pop .sws { display:flex; gap:6px; flex-wrap:wrap; }
+
+.toasts { position:fixed; z-index:60; right:max(16px, env(safe-area-inset-right, 0px)); bottom:calc(16px + env(safe-area-inset-bottom, 0px)); display:flex; flex-direction:column; gap:8px; align-items:flex-end; pointer-events:none; }
+.toast { pointer-events:auto; width:min(300px, calc(100vw - 32px)); display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--panel); border:1px solid var(--line); border-radius:6px; box-shadow:var(--shadow); font-size:12.5px; line-height:1.45; }
+.toast .ic { color:var(--warn); flex:none; margin-top:1px; }
+.toast b { display:block; }
 
 @media (max-width: 820px) {
-  body { overflow:auto; height:auto; }
-  html { height:auto; }
-  .app { height:auto; grid-template-columns:minmax(0,1fr); grid-template-rows:auto; grid-template-areas:"top" "tools" "main" "side" "foot"; }
-  .tools { flex-direction:row; justify-content:flex-start; padding:4px 6px; }
-  .tools .div { width:1px; height:22px; margin:0 4px; }
-  .main { height:72vh; min-height:420px; }
+  html, body { height:auto; }
+  body { overflow:auto; }
+  .app { height:auto; grid-template-columns:minmax(0,1fr); grid-template-rows:auto; grid-template-areas:"top" "tools" "chart" "bottom" "side"; }
+  .app.side-closed .side { display:flex; }
+  .top { height:42px; }
+  .strip { display:none; }
+  .tools { flex-direction:row; overflow-x:auto; padding:3px 4px; }
+  .tools .hsep { width:1px; height:24px; margin:0 4px; }
+  .chartcol { height:68vh; min-height:400px; }
+  .bottom { height:32px; }
   .side { max-height:none; }
-  .list { overflow:visible; }
-  .brand span { display:none; }
-  .top { gap:6px 8px; }
-  .top .sep { display:none; }
-  .quote { order:1; width:100%; }
-  #tfSeg { order:2; width:100%; }
-  #typeSel { order:3; }
-  #indSeg { order:4; flex:1 1 0; min-width:0; }
-  .legend { font-size:10.5px; top:6px; left:8px; max-width:calc(100% - 80px); }
-  .legend .title { font-size:11.5px; }
-  .legend .ind { display:none; }
+  .wlist, .allist { overflow:visible; }
+  .lbl-wide { display:none; }
+  .legend { max-width:calc(100% - 80px); font-size:11px; line-height:18px; }
+  .ltitle { font-size:12px; }
+  .hint { bottom:36px; }
+  .drawbar { top:auto; bottom:36px; right:auto; left:50%; transform:translateX(-50%); }
 }
-@media (prefers-reduced-motion: reduce) { .row .p { transition:none; } }
+@media (prefers-reduced-motion: reduce) { .wrow .p { transition:none; } }
 </style>
 
-<div class="app">
-  <header class="top panel">
-    <div class="brand">
-      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="7" width="4" height="9" rx="1" fill="var(--up)"/><rect x="3.5" y="4" width="1" height="14" fill="var(--up)"/><rect x="8" y="4" width="4" height="7" rx="1" fill="var(--down)"/><rect x="9.5" y="2" width="1" height="12" fill="var(--down)"/><rect x="14" y="5" width="4" height="10" rx="1" fill="var(--accent)"/><rect x="15.5" y="3" width="1" height="15" fill="var(--accent)"/></svg>
-      <span>Candle Desk</span>
-    </div>
-    <select id="symSel" class="sym-select" aria-label="종목 선택"></select>
-    <div class="quote"><span id="qLast" class="last num">—</span><span id="qChg" class="chg num">—</span></div>
-    <div class="sep"></div>
-    <div class="seg" id="tfSeg" role="group" aria-label="시간 단위"></div>
-    <div class="sep"></div>
-    <select id="typeSel" class="type-select" aria-label="차트 종류">
-      <option value="candles">캔들</option>
-      <option value="heikin">하이킨아시</option>
-      <option value="bars">바(OHLC)</option>
-      <option value="line">라인</option>
-      <option value="area">영역</option>
-    </select>
-    <div class="seg" id="indSeg" role="group" aria-label="지표"></div>
+<div class="app" id="app">
+  <header class="top panel" aria-label="차트 툴바">
+    <button class="tb sym-btn" id="symBtn" title="종목 검색 (아무 글자나 입력)"><span id="symBtnTxt">BTCUSD</span></button>
+    <div class="vsep"></div>
+    <button class="tb tf-btn" id="tfBtn" aria-haspopup="menu" aria-expanded="false" title="시간 단위"></button>
+    <div class="vsep"></div>
+    <button class="tb" id="typeBtn" aria-haspopup="menu" aria-expanded="false" title="차트 종류"></button>
+    <div class="vsep"></div>
+    <button class="tb" id="indBtn" title="지표 추가"><span id="indIco"></span><span>지표</span></button>
+    <div class="vsep"></div>
+    <button class="tb" id="alertTopBtn" title="알림 만들기"><span id="alertIco"></span><span class="lbl-wide">알림</span></button>
+    <div class="vsep"></div>
+    <button class="tb" id="undoBtn" title="실행 취소 (Ctrl+Z)" aria-label="실행 취소"></button>
+    <button class="tb" id="redoBtn" title="다시 실행 (Ctrl+Y)" aria-label="다시 실행"></button>
+    <div class="spacer"></div>
+    <button class="tb" id="themeBtn" title="밝은/어두운 테마" aria-label="테마 전환"></button>
+    <button class="tb" id="fullBtn" title="전체 화면" aria-label="전체 화면"></button>
   </header>
 
-  <nav class="tools panel" aria-label="그리기 도구">
-    <button data-tool="cursor" title="커서 (Esc)" aria-label="커서"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2l10 6.5-4.5 1L7.5 14z" stroke-linejoin="round"/></svg></button>
-    <button data-tool="trend" title="추세선 (두 점 클릭)" aria-label="추세선"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 15L15 3"/><circle cx="3.5" cy="14.5" r="1.6" fill="var(--panel)"/><circle cx="14.5" cy="3.5" r="1.6" fill="var(--panel)"/></svg></button>
-    <button data-tool="hline" title="수평선 (한 번 클릭)" aria-label="수평선"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 9h15"/><circle cx="9" cy="9" r="1.6" fill="var(--panel)"/></svg></button>
-    <div class="div"></div>
-    <button id="clearBtn" title="이 차트의 그림 모두 지우기" aria-label="그림 지우기"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h12M7 5V3h4v2M5 5l1 10h6l1-10"/></svg></button>
-    <button id="fitBtn" title="최근 구간으로 맞추기" aria-label="화면 맞추기"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6V2h4M12 2h4v4M16 12v4h-4M6 16H2v-4"/></svg></button>
-  </nav>
+  <nav class="tools panel" id="tools" aria-label="그리기 도구"></nav>
 
-  <main class="main panel">
-    <div class="chart-wrap">
-      <div class="legend" id="legend"></div>
+  <section class="chartcol panel" aria-label="차트">
+    <div class="wrap" id="wrap">
+      <div class="legend" id="legend">
+        <div class="lhead">
+          <button class="lcollapse" id="lgCollapse" aria-label="지표 목록 접기/펼치기"></button>
+          <span class="ltitle" id="lgTitle"></span>
+          <span class="sim" title="무작위로 생성된 시세입니다">SIM</span>
+          <span class="lohlc num" id="lgOHLC"></span>
+        </div>
+        <div id="lgRows"></div>
+      </div>
       <div id="chart"></div>
+      <canvas id="draw"></canvas>
+      <div class="drawbar" id="drawBar" hidden></div>
       <div class="hint" id="hint" hidden></div>
     </div>
-    <div class="rsi-wrap" id="rsiWrap">
-      <div class="rsi-label" id="rsiLabel">RSI 14</div>
-      <div id="rsi"></div>
-    </div>
-  </main>
+    <div id="panes"></div>
+  </section>
 
-  <aside class="side panel" aria-label="관심종목">
-    <h2><span>관심종목</span><span id="clock" class="num"></span></h2>
-    <div class="wl-head"><span>종목</span><span>현재가</span><span>등락</span></div>
-    <div class="list" id="list"></div>
-    <dl class="detail" id="detail"></dl>
+  <div class="bottom panel" id="bottom" aria-label="기간과 가격 축">
+    <div id="ranges" style="display:flex;gap:1px"></div>
+    <div class="vsep"></div>
+    <span class="clock num" id="clock"></span>
+    <div style="flex:1 0 8px"></div>
+    <button class="tb" id="pctBtn" title="퍼센트 눈금">%</button>
+    <button class="tb" id="logBtn" title="로그 눈금">log</button>
+    <button class="tb" id="autoBtn" title="가격 축 자동 맞춤">auto</button>
+  </div>
+
+  <aside class="side panel" id="side" aria-label="오른쪽 패널">
+    <div class="ptabs" role="tablist">
+      <button role="tab" data-panel="watch" id="tabWatch">관심종목</button>
+      <button role="tab" data-panel="alerts" id="tabAlerts">알림</button>
+    </div>
+    <section class="psec" id="pWatch">
+      <div class="wl-head"><span>종목</span><span>현재가</span><span>변동</span><span>변동%</span></div>
+      <div class="wlist" id="wlist"></div>
+      <div class="det" id="det">
+        <div class="det-top"><b id="dSym"></b><span class="det-ex" id="dEx"></span><span class="sim">SIM</span></div>
+        <div class="det-name" id="dName"></div>
+        <div class="det-price"><span class="big num" id="dLast"></span><span class="num" id="dChg"></span></div>
+        <div class="rng"><span>일중 범위</span><div class="rng-bar"><i id="dDayDot"></i></div><div class="rng-lbl num"><span id="dDayLo"></span><span id="dDayHi"></span></div></div>
+        <div class="rng"><span>52주 범위</span><div class="rng-bar"><i id="dYrDot"></i></div><div class="rng-lbl num"><span id="dYrLo"></span><span id="dYrHi"></span></div></div>
+        <dl class="stats" id="dStats"></dl>
+      </div>
+    </section>
+    <section class="psec" id="pAlerts" hidden>
+      <form class="alform" id="alForm">
+        <label class="full">종목<input id="alSym" readonly></label>
+        <label>조건<select id="alCond"><option value="cross">교차</option><option value="up">위로 교차</option><option value="down">아래로 교차</option></select></label>
+        <label>가격<input id="alPrice" type="number" step="any" inputmode="decimal" required></label>
+        <button type="submit" class="btn-primary full">알림 추가</button>
+      </form>
+      <div class="allist" id="alList"></div>
+    </section>
   </aside>
 
-  <footer class="foot">
-    <span><span class="sim">시뮬레이션 데이터</span> · 실제 시세가 아니며 무작위로 생성된 가격입니다</span>
-    <span>시간대: 브라우저 현지 시간 · 차트 엔진: Lightweight Charts</span>
-  </footer>
+  <nav class="strip panel" aria-label="패널 선택">
+    <button class="tb" data-strip="watch" title="관심종목" aria-label="관심종목"></button>
+    <button class="tb" data-strip="alerts" title="알림" aria-label="알림"></button>
+  </nav>
 </div>
+
+<div class="back" id="symModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="symTitle">
+    <div class="mhead"><h3 id="symTitle">종목 검색</h3><button class="tb" data-close aria-label="닫기"></button></div>
+    <div class="msearch"><span data-ico="search"></span><input id="symQ" placeholder="종목 코드 또는 이름" autocomplete="off" spellcheck="false"></div>
+    <div class="mtabs" id="symTabs"></div>
+    <div class="mlist" id="symList" role="listbox"></div>
+  </div>
+</div>
+<div class="back" id="indModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="indTitle">
+    <div class="mhead"><h3 id="indTitle">지표</h3><button class="tb" data-close aria-label="닫기"></button></div>
+    <div class="msearch"><span data-ico="search"></span><input id="indQ" placeholder="지표 검색" autocomplete="off" spellcheck="false"></div>
+    <div class="mlist" id="indList"></div>
+  </div>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <script>
 (() => {
 const LW = window.LightweightCharts;
 const $ = id => document.getElementById(id);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const isMobile = () => matchMedia('(max-width: 820px)').matches;
+const coarse = () => matchMedia('(pointer: coarse)').matches;
 
+// ---------- 아이콘 ----------
+const svg = d => `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const I = {
+  cross:svg('<path d="M9 2v14M2 9h14"/>'),
+  arrow:svg('<path d="M4 2.5l10 6-4.3 1.1L7.6 14z"/>'),
+  trend:svg('<path d="M3.5 14.5l11-11"/><circle cx="3.5" cy="14.5" r="1.6" fill="var(--panel)"/><circle cx="14.5" cy="3.5" r="1.6" fill="var(--panel)"/>'),
+  ray:svg('<path d="M3.5 14.5L16.5 1.5"/><circle cx="3.5" cy="14.5" r="1.6" fill="var(--panel)"/><circle cx="9" cy="9" r="1.6" fill="var(--panel)"/>'),
+  hline:svg('<path d="M1.5 9h15"/><circle cx="9" cy="9" r="1.6" fill="var(--panel)"/>'),
+  vline:svg('<path d="M9 1.5v15"/><circle cx="9" cy="9" r="1.6" fill="var(--panel)"/>'),
+  rect:svg('<rect x="3" y="4.5" width="12" height="9" rx=".5"/>'),
+  fib:svg('<path d="M2 3.5h14M2 7h14M2 10.5h14M2 14.5h14"/><path d="M3.5 14.5L14.5 3.5" stroke-dasharray="1.5 2"/>'),
+  measure:svg('<path d="M9 3v12M6 6l3-3 3 3M6 12l3 3 3-3"/>'),
+  magnet:svg('<path d="M4 3v6a5 5 0 0010 0V3M7 3v6a2 2 0 004 0V3M4 6h3M11 6h3"/>'),
+  eye:svg('<path d="M1.5 9S4.2 4 9 4s7.5 5 7.5 5-2.7 5-7.5 5S1.5 9 1.5 9z"/><circle cx="9" cy="9" r="2.2"/>'),
+  eyeOff:svg('<path d="M1.5 9S4.2 4 9 4s7.5 5 7.5 5-2.7 5-7.5 5S1.5 9 1.5 9z"/><circle cx="9" cy="9" r="2.2"/><path d="M3 15L15 3"/>'),
+  trash:svg('<path d="M3 5h12M7 5V3h4v2M4.5 5l1 10.5h7l1-10.5"/>'),
+  gear:svg('<circle cx="9" cy="9" r="2.3"/><path d="M9 1.8v2M9 14.2v2M1.8 9h2M14.2 9h2M3.9 3.9l1.4 1.4M12.7 12.7l1.4 1.4M3.9 14.1l1.4-1.4M12.7 5.3l1.4-1.4"/>'),
+  close:svg('<path d="M4.5 4.5l9 9M13.5 4.5l-9 9"/>'),
+  search:svg('<circle cx="8" cy="8" r="5"/><path d="M12 12l4 4"/>'),
+  undo:svg('<path d="M6 4L2.5 7.5 6 11"/><path d="M2.5 7.5H11a4 4 0 010 8H8"/>'),
+  redo:svg('<path d="M12 4l3.5 3.5L12 11"/><path d="M15.5 7.5H7a4 4 0 000 8h3"/>'),
+  fx:svg('<path d="M8 3.5c-1.6 0-2.1.8-2.4 2.3L4 15M2.5 7.5h5M10 7.5l5 7M15 7.5l-5 7"/>'),
+  sun:svg('<circle cx="9" cy="9" r="3.2"/><path d="M9 1.5v1.8M9 14.7v1.8M1.5 9h1.8M14.7 9h1.8M3.7 3.7L5 5M13 13l1.3 1.3M3.7 14.3L5 13M13 5l1.3-1.3"/>'),
+  moon:svg('<path d="M14.5 11.2A6 6 0 016.8 3.5a6 6 0 107.7 7.7z"/>'),
+  full:svg('<path d="M2.5 6.5v-4h4M11.5 2.5h4v4M15.5 11.5v4h-4M6.5 15.5h-4v-4"/>'),
+  list:svg('<path d="M6.5 4.5h9M6.5 9h9M6.5 13.5h9"/><circle cx="3" cy="4.5" r=".9" fill="currentColor"/><circle cx="3" cy="9" r=".9" fill="currentColor"/><circle cx="3" cy="13.5" r=".9" fill="currentColor"/>'),
+  bell:svg('<path d="M4.5 12.5V8a4.5 4.5 0 019 0v4.5l1.5 1.5H3zM7.5 16h3"/>'),
+  caret:'<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
+  candles:svg('<path d="M5 2.5v13M13 2.5v13"/><rect x="3.3" y="5" width="3.4" height="7" fill="currentColor"/><rect x="11.3" y="6" width="3.4" height="5" fill="var(--panel)"/>'),
+  hollow:svg('<path d="M5 2.5v13M13 2.5v13"/><rect x="3.3" y="5" width="3.4" height="7" fill="var(--panel)"/><rect x="11.3" y="6" width="3.4" height="5" fill="currentColor"/>'),
+  heikin:svg('<path d="M5 3v12M13 3v12"/><rect x="3.3" y="6" width="3.4" height="6" rx="1" fill="currentColor"/><rect x="11.3" y="5" width="3.4" height="7" rx="1" fill="currentColor"/>'),
+  bars:svg('<path d="M5 3v12M3 6h2M5 12h2M13 4v11M11 12h2M13 7h2"/>'),
+  line:svg('<path d="M2 13l4-5 3 3 6-7"/>'),
+  area:svg('<path d="M2 13l4-5 3 3 6-7v12H2z" fill="currentColor" fill-opacity=".22" stroke="none"/><path d="M2 13l4-5 3 3 6-7"/>'),
+  baseline:svg('<path d="M2 9.5h14" stroke-dasharray="1.5 1.5"/><path d="M2 12.5l4-5 3 4 6-8"/>'),
+};
+document.querySelectorAll('[data-ico]').forEach(e => e.innerHTML = I[e.dataset.ico]);
+document.querySelectorAll('[data-close]').forEach(e => e.innerHTML = I.close);
+
+// ---------- 종목·시간 단위 ----------
 const SYMBOLS = [
-  { s:'BTCUSD', n:'비트코인 / 달러',  p:67250, v:0.028, d:2, vb:1800 },
-  { s:'ETHUSD', n:'이더리움 / 달러',  p:3420,  v:0.032, d:2, vb:22000 },
-  { s:'AAPL',   n:'Apple Inc.',       p:228.4, v:0.014, d:2, vb:5.2e7 },
-  { s:'NVDA',   n:'NVIDIA Corp.',     p:134.8, v:0.027, d:2, vb:2.4e8 },
-  { s:'TSLA',   n:'Tesla Inc.',       p:251.2, v:0.033, d:2, vb:9.0e7 },
-  { s:'005930', n:'삼성전자',          p:71800, v:0.016, d:0, vb:1.3e7 },
-  { s:'000660', n:'SK하이닉스',        p:182500,v:0.024, d:0, vb:3.1e6 },
-  { s:'KOSPI',  n:'코스피 지수',       p:2598.3,v:0.009, d:2, vb:4.1e8 },
-  { s:'SPX',    n:'S&P 500 지수',      p:5718.6,v:0.008, d:2, vb:2.3e9 },
-  { s:'USDKRW', n:'달러 / 원',         p:1381.5,v:0.004, d:2, vb:0 },
-  { s:'XAUUSD', n:'금 / 달러',         p:2655.4,v:0.009, d:2, vb:0 },
+  { s:'BTCUSD', n:'비트코인 / 미국 달러',    t:'crypto', x:'CRYPTO', p:67250,  v:.028, d:2, vb:1800 },
+  { s:'ETHUSD', n:'이더리움 / 미국 달러',    t:'crypto', x:'CRYPTO', p:3420,   v:.032, d:2, vb:22000 },
+  { s:'SOLUSD', n:'솔라나 / 미국 달러',      t:'crypto', x:'CRYPTO', p:182.4,  v:.045, d:2, vb:3.1e6 },
+  { s:'AAPL',   n:'Apple Inc.',             t:'stock',  x:'NASDAQ', p:228.4,  v:.014, d:2, vb:5.2e7 },
+  { s:'NVDA',   n:'NVIDIA Corporation',     t:'stock',  x:'NASDAQ', p:134.8,  v:.027, d:2, vb:2.4e8 },
+  { s:'MSFT',   n:'Microsoft Corporation',  t:'stock',  x:'NASDAQ', p:418.2,  v:.013, d:2, vb:2.1e7 },
+  { s:'TSLA',   n:'Tesla, Inc.',            t:'stock',  x:'NASDAQ', p:251.2,  v:.033, d:2, vb:9.0e7 },
+  { s:'005930', n:'삼성전자',                t:'stock',  x:'KRX',    p:71800,  v:.016, d:0, vb:1.3e7 },
+  { s:'000660', n:'SK하이닉스',              t:'stock',  x:'KRX',    p:182500, v:.024, d:0, vb:3.1e6 },
+  { s:'035420', n:'NAVER',                  t:'stock',  x:'KRX',    p:168500, v:.020, d:0, vb:6.0e5 },
+  { s:'KOSPI',  n:'코스피 종합지수',          t:'index',  x:'KRX',    p:2598.3, v:.009, d:2, vb:0 },
+  { s:'SPX',    n:'S&P 500 지수',            t:'index',  x:'INDEX',  p:5718.6, v:.008, d:2, vb:0 },
+  { s:'NDX',    n:'나스닥 100 지수',          t:'index',  x:'INDEX',  p:20150,  v:.011, d:2, vb:0 },
+  { s:'USDKRW', n:'미국 달러 / 대한민국 원',  t:'fx',     x:'FX',     p:1381.5, v:.004, d:2, vb:0 },
+  { s:'EURUSD', n:'유로 / 미국 달러',         t:'fx',     x:'FX',     p:1.0842, v:.005, d:4, vb:0 },
+  { s:'XAUUSD', n:'금 / 미국 달러',           t:'commodity', x:'OTC', p:2655.4, v:.009, d:2, vb:0 },
 ];
 const BY = Object.fromEntries(SYMBOLS.map(s => [s.s, s]));
-const TF = { '1m':60, '5m':300, '15m':900, '1H':3600, '4H':14400, '1D':86400, '1W':604800 };
-const TZ = -new Date().getTimezoneOffset() * 60;            // 차트 시간축을 현지 시간으로 표시하기 위한 보정
+const CAT = { all:'전체', stock:'주식', crypto:'크립토', index:'지수', fx:'외환', commodity:'원자재' };
+const BADGE = { crypto:'--i0', stock:'--accent', index:'--i1', fx:'--i3', commodity:'--i5' };
+const TFS = [
+  { k:'1',  s:60,     l:'1분',   sh:'1m',  g:'분' },
+  { k:'5',  s:300,    l:'5분',   sh:'5m',  g:'분' },
+  { k:'15', s:900,    l:'15분',  sh:'15m', g:'분' },
+  { k:'60', s:3600,   l:'1시간', sh:'1h',  g:'시간' },
+  { k:'240',s:14400,  l:'4시간', sh:'4h',  g:'시간' },
+  { k:'D',  s:86400,  l:'1일',   sh:'D',   g:'일 이상' },
+  { k:'W',  s:604800, l:'1주',   sh:'W',   g:'일 이상' },
+];
+const TF = Object.fromEntries(TFS.map(t => [t.k, t]));
+const TYPES = [
+  ['candles','캔들'], ['hollow','속 빈 캔들'], ['heikin','하이킨아시'], ['bars','바'], ['line','라인'], ['area','영역'], ['baseline','기준선'],
+];
+const TZ = -new Date().getTimezoneOffset() * 60;
 const nowT = () => Math.floor(Date.now() / 1000) + TZ;
+const tzLabel = 'UTC' + (TZ >= 0 ? '+' : '−') + Math.abs(TZ / 3600);
 
-// ---------- 저장된 설정 ----------
-const state = { sym:'BTCUSD', tf:'1H', type:'candles', tool:'cursor',
-  ind:{ ma20:true, ma50:true, ema200:false, bb:false, vol:true, rsi:true } };
-const store = {
-  get(k, d) { try { const v = localStorage.getItem('cdesk.' + k); return v ? JSON.parse(v) : d; } catch(e) { return d; } },
-  set(k, v) { try { localStorage.setItem('cdesk.' + k, JSON.stringify(v)); } catch(e) {} },
+// ---------- 지표 정의 ----------
+const DEF = {
+  sma:   { name:'이동평균',         desc:'단순 이동평균 (MA)',                 pane:false, params:{ len:20 } },
+  ema:   { name:'지수 이동평균',     desc:'최근 가격에 가중치를 둔 이동평균 (EMA)', pane:false, params:{ len:50 } },
+  bb:    { name:'볼린저 밴드',       desc:'이동평균 ± 표준편차 밴드',             pane:false, params:{ len:20, mult:2 } },
+  vol:   { name:'거래량',           desc:'봉별 거래량 막대',                    pane:false, params:{} },
+  rsi:   { name:'상대강도지수',      desc:'RSI · 과매수 70 / 과매도 30',         pane:true,  params:{ len:14 } },
+  macd:  { name:'MACD',            desc:'이동평균 수렴·확산',                  pane:true,  params:{ fast:12, slow:26, sig:9 } },
+  stoch: { name:'스토캐스틱',        desc:'%K / %D 모멘텀 오실레이터',            pane:true,  params:{ k:14, smooth:3, d:3 } },
 };
-Object.assign(state, store.get('prefs', {}), { tool:'cursor' });
-if (!BY[state.sym]) state.sym = 'BTCUSD';
-if (!TF[state.tf]) state.tf = '1H';
-const drawings = store.get('drawings', {});
+const PLBL = { len:'길이', mult:'표준편차 배수', fast:'빠른 길이', slow:'느린 길이', sig:'시그널 길이', k:'%K 길이', smooth:'%K 평활', d:'%D 평활' };
+const indLabel = c => {
+  const p = c.p;
+  return { sma:`MA ${p.len}`, ema:`EMA ${p.len}`, bb:`BB ${p.len} ${p.mult}`, vol:'거래량', rsi:`RSI ${p.len}`,
+           macd:`MACD ${p.fast} ${p.slow} ${p.sig}`, stoch:`Stoch ${p.k} ${p.smooth} ${p.d}` }[c.type];
+};
 
-// ---------- 난수 / 데이터 생성 ----------
+// ---------- 저장 ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('cdesk2.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('cdesk2.' + k, JSON.stringify(v)); } catch (e) {} },
+};
+const saved = store.get('prefs', null);
+const state = Object.assign({
+  sym:'BTCUSD', tf:'60', type:'candles', scale:'normal', panel:'watch', sideOpen:true, magnet:false, hideDraw:false, theme:null,
+  inds:[ { id:1, type:'vol', p:{} }, { id:2, type:'sma', p:{ len:20 }, c:0 }, { id:3, type:'sma', p:{ len:50 }, c:1 }, { id:4, type:'rsi', p:{ len:14 }, c:1 } ],
+  nextId:5, alerts:null, legendCollapsed:isMobile(),
+}, saved || {});
+state.tool = 'cross';
+if (!BY[state.sym]) state.sym = 'BTCUSD';
+if (!TF[state.tf]) state.tf = '60';
+if (!TYPES.some(t => t[0] === state.type)) state.type = 'candles';
+state.inds = (state.inds || []).filter(c => DEF[c.type]);
+const drawings = store.get('drawings', {});
+function savePrefs() {
+  const { sym, tf, type, scale, panel, sideOpen, magnet, hideDraw, theme, inds, nextId, alerts, legendCollapsed } = state;
+  store.set('prefs', { sym, tf, type, scale, panel, sideOpen, magnet, hideDraw, theme, inds, nextId, alerts, legendCollapsed });
+}
+if (state.theme) document.documentElement.dataset.theme = state.theme;
+
+// ---------- 시뮬레이션 데이터 ----------
 function hash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function gauss(r) { let u = 0; while (!u) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
 
 const price = {}, prevClose = {}, cache = {};
 SYMBOLS.forEach(s => price[s.s] = s.p);
-
-function generate(sym, tf) {
-  const per = TF[tf], n = 600, r = rng(hash(sym.s + '|' + tf));
+function generate(sym, tfk) {
+  const per = TF[tfk].s, n = 1000, r = rng(hash(sym.s + '|' + tfk));
   const vol = sym.v * Math.sqrt(per / 86400);
   const end = Math.floor(nowT() / per) * per;
   let c = 1, drift = 0; const out = [];
   for (let i = 0; i < n; i++) {
-    if (r() < 0.035) drift = (r() - 0.5) * vol * 0.7;        // 가끔 추세가 바뀌는 구간
+    if (r() < 0.035) drift = (r() - 0.5) * vol * 0.7;
     const o = c, ch = gauss(r) * vol + drift;
     c = o * Math.exp(ch);
-    const h = Math.max(o, c) * (1 + Math.abs(gauss(r)) * vol * 0.45);
-    const l = Math.min(o, c) * (1 - Math.abs(gauss(r)) * vol * 0.45);
+    const hi = Math.max(o, c) * (1 + Math.abs(gauss(r)) * vol * 0.45);
+    const lo = Math.min(o, c) * (1 - Math.abs(gauss(r)) * vol * 0.45);
     const v = sym.vb * (per / 86400) * (0.4 + r() * 1.2) * (1 + Math.abs(ch) / vol);
-    out.push({ time:end - (n - 1 - i) * per, open:o, high:h, low:l, close:c, volume:v });
+    out.push({ time:end - (n - 1 - i) * per, open:o, high:hi, low:lo, close:c, volume:v });
   }
   const k = price[sym.s] / c;
   out.forEach(b => { b.open *= k; b.high *= k; b.low *= k; b.close *= k; });
   return out;
 }
-SYMBOLS.forEach(s => { const d = generate(s, '1D'); cache[s.s + '|1D'] = d; prevClose[s.s] = d[d.length - 2].close; });
-
-// 마지막 봉 이후 시간이 지났으면 새 봉을 만들고, 마지막 봉을 현재가에 맞춘다
-function catchUp(symKey, tf, bars) {
-  const per = TF[tf], t = nowT(); let added = 0;
-  let last = bars[bars.length - 1];
-  while (t >= last.time + per) {
-    const p = last.close;
-    last = { time:last.time + per, open:p, high:p, low:p, close:p, volume:0 };
-    bars.push(last); added++;
-  }
-  const p = price[symKey];
-  last.close = p; last.high = Math.max(last.high, p); last.low = Math.min(last.low, p);
+SYMBOLS.forEach(s => { const d = generate(s, 'D'); cache[s.s + '|D'] = d; prevClose[s.s] = d[d.length - 2].close; });
+function catchUp(sk, tfk, bars) {
+  const per = TF[tfk].s, t = nowT(); let added = 0, last = bars[bars.length - 1];
+  while (t >= last.time + per) { const p = last.close; last = { time:last.time + per, open:p, high:p, low:p, close:p, volume:0 }; bars.push(last); added++; }
+  const p = price[sk]; last.close = p; last.high = Math.max(last.high, p); last.low = Math.min(last.low, p);
   return added;
 }
-function getBars(symKey = state.sym, tf = state.tf) {
-  const key = symKey + '|' + tf;
-  if (!cache[key]) cache[key] = generate(BY[symKey], tf);
-  return cache[key];
-}
+function getBars(sk = state.sym, tfk = state.tf) { const key = sk + '|' + tfk; return cache[key] || (cache[key] = generate(BY[sk], tfk)); }
 
-// ---------- 지표 ----------
-const closes = bars => bars.map(b => b.close);
+// ---------- 지표 계산 ----------
 function sma(a, n) { const o = []; let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; o.push(i >= n - 1 ? s / n : null); } return o; }
 function ema(a, n) { const k = 2 / (n + 1), o = []; let e; for (let i = 0; i < a.length; i++) { e = i ? a[i] * k + e * (1 - k) : a[i]; o.push(i >= n - 1 ? e : null); } return o; }
-function boll(a, n = 20, m = 2) {
+function boll(a, n, m) {
   const mid = sma(a, n), up = [], lo = [];
   for (let i = 0; i < a.length; i++) {
     if (mid[i] == null) { up.push(null); lo.push(null); continue; }
@@ -282,7 +503,7 @@ function boll(a, n = 20, m = 2) {
   }
   return { mid, up, lo };
 }
-function rsi(a, n = 14) {
+function rsi(a, n) {
   const o = [null]; let g = 0, l = 0;
   for (let i = 1; i < a.length; i++) {
     const d = a[i] - a[i - 1], G = Math.max(d, 0), L = Math.max(-d, 0);
@@ -291,305 +512,856 @@ function rsi(a, n = 14) {
   }
   return o;
 }
+function macd(a, f, s, g) {
+  const ef = ema(a, f), es = ema(a, s);
+  const m = a.map((_, i) => ef[i] != null && es[i] != null ? ef[i] - es[i] : null);
+  const st = m.findIndex(v => v != null), sig = new Array(a.length).fill(null);
+  if (st >= 0) ema(m.slice(st), g).forEach((v, j) => sig[st + j] = v);
+  return { m, sig, hist:m.map((v, i) => v != null && sig[i] != null ? v - sig[i] : null) };
+}
+function stoch(bars, k, sm, d) {
+  const raw = bars.map((b, i) => {
+    if (i < k - 1) return null;
+    let hh = -Infinity, ll = Infinity;
+    for (let j = i - k + 1; j <= i; j++) { hh = Math.max(hh, bars[j].high); ll = Math.min(ll, bars[j].low); }
+    return hh === ll ? 50 : (b.close - ll) / (hh - ll) * 100;
+  });
+  const avg = (arr, n) => arr.map((_, i) => { if (i < n - 1) return null; let s = 0; for (let j = i - n + 1; j <= i; j++) { if (arr[j] == null) return null; s += arr[j]; } return s / n; });
+  const K = avg(raw, sm); return { K, D:avg(K, d) };
+}
 function heikin(bars) {
   const o = []; let po, pc;
   bars.forEach((b, i) => {
-    const c = (b.open + b.high + b.low + b.close) / 4;
-    const op = i ? (po + pc) / 2 : (b.open + b.close) / 2;
-    o.push({ time:b.time, open:op, high:Math.max(b.high, op, c), low:Math.min(b.low, op, c), close:c });
-    po = op; pc = c;
+    const c = (b.open + b.high + b.low + b.close) / 4, op = i ? (po + pc) / 2 : (b.open + b.close) / 2;
+    o.push({ time:b.time, open:op, high:Math.max(b.high, op, c), low:Math.min(b.low, op, c), close:c }); po = op; pc = c;
   });
   return o;
 }
 const toLine = (bars, vals) => bars.map((b, i) => vals[i] == null ? { time:b.time } : { time:b.time, value:vals[i] });
 
-// ---------- 테마 ----------
+// ---------- 테마·서식 ----------
+let C;
 function tok() {
   const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue('--' + n).trim();
-  return { panel:g('panel'), line:g('line'), grid:g('grid'), fg:g('fg'), muted:g('muted'), accent:g('accent'), up:g('up'), down:g('down'),
-           ma20:g('c-ma20'), ma50:g('c-ma50'), ema:g('c-ema'), bb:g('c-bb') };
+  const o = {}; ['panel','line','grid','fg','muted','accent','up','down','warn','i0','i1','i2','i3','i4','i5','on-color'].forEach(k => o[k] = g(k)); return o;
 }
-function alpha(hex, a) {
-  const h = hex.replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
-  return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
-}
-function chartOpts(c) {
+C = tok();
+const pal = i => C['i' + ((i % 6) + 6) % 6];
+const col = t => C[t] || t;
+function alpha(hex, a) { const h = hex.replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+const prec = () => BY[state.sym].d;
+const fmt = (v, d = prec()) => v == null || isNaN(v) ? '—' : v.toLocaleString('en-US', { minimumFractionDigits:d, maximumFractionDigits:d });
+const fmtVol = v => v == null ? '—' : v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(2) + 'K' : v.toFixed(0);
+const sign = v => (v >= 0 ? '+' : '−');
+const fmtDur = s => { s = Math.max(0, Math.floor(s)); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60, p = n => String(n).padStart(2, '0');
+  return d ? `${d}일 ${h}시간` : h ? `${p(h)}:${p(m)}:${p(x)}` : `${p(m)}:${p(x)}`; };
+
+function chartOpts() {
+  const hide = state.tool === 'arrow';
   return {
-    layout:{ background:{ type:'solid', color:c.panel }, textColor:c.muted, fontFamily:'JetBrains Mono, ui-monospace, Menlo, monospace', fontSize:11 },
-    grid:{ vertLines:{ color:c.grid }, horzLines:{ color:c.grid } },
-    rightPriceScale:{ borderColor:c.line, minimumWidth:74 },
-    timeScale:{ borderColor:c.line, timeVisible:true, secondsVisible:false, rightOffset:6 },
+    layout:{ background:{ type:'solid', color:C.panel }, textColor:C.muted, fontFamily:'JetBrains Mono, ui-monospace, Menlo, monospace', fontSize:11 },
+    grid:{ vertLines:{ color:C.grid }, horzLines:{ color:C.grid } },
+    rightPriceScale:{ borderColor:C.line, minimumWidth:78 },
+    timeScale:{ borderColor:C.line, timeVisible:true, secondsVisible:false, rightOffset:8 },
     crosshair:{ mode:LW.CrosshairMode.Normal,
-      vertLine:{ color:c.muted, labelBackgroundColor:c.fg }, horzLine:{ color:c.muted, labelBackgroundColor:c.fg } },
+      vertLine:{ visible:!hide, labelVisible:true, color:C.muted, width:1, style:LW.LineStyle.Dashed, labelBackgroundColor:C.fg },
+      horzLine:{ visible:!hide, labelVisible:true, color:C.muted, width:1, style:LW.LineStyle.Dashed, labelBackgroundColor:C.fg } },
+    localization:{ locale:'ko-KR' },
   };
 }
 
 // ---------- 차트 ----------
-let C = tok();
-const main = LW.createChart($('chart'), { autoSize:true, ...chartOpts(C) });
-const rsiC = LW.createChart($('rsi'),   { autoSize:true, ...chartOpts(C) });
-
-const lineOpt = color => ({ color, lineWidth:1.5, lastValueVisible:false, priceLineVisible:false, crosshairMarkerVisible:false });
-let mainSeries = null;
-const volS  = main.addHistogramSeries({ priceScaleId:'vol', priceFormat:{ type:'volume' }, lastValueVisible:false, priceLineVisible:false });
-main.priceScale('vol').applyOptions({ scaleMargins:{ top:0.82, bottom:0 } });
-const ind = {
-  ma20:  main.addLineSeries(lineOpt(C.ma20)),
-  ma50:  main.addLineSeries(lineOpt(C.ma50)),
-  ema200:main.addLineSeries(lineOpt(C.ema)),
-  bbU:   main.addLineSeries({ ...lineOpt(C.bb), lineWidth:1 }),
-  bbM:   main.addLineSeries({ ...lineOpt(C.bb), lineWidth:1, lineStyle:LW.LineStyle.Dashed }),
-  bbL:   main.addLineSeries({ ...lineOpt(C.bb), lineWidth:1 }),
-};
-const rsiS = rsiC.addLineSeries({ color:C.ma50, lineWidth:1.5, priceLineVisible:false,
-  autoscaleInfoProvider:() => ({ priceRange:{ minValue:0, maxValue:100 } }),
-  priceFormat:{ type:'price', precision:1, minMove:0.1 } });
-rsiC.priceScale('right').applyOptions({ scaleMargins:{ top:0.12, bottom:0.08 } });
-const rsiLines = [70, 30].map(p => rsiS.createPriceLine({ price:p, color:C.muted, lineWidth:1, lineStyle:LW.LineStyle.Dashed, axisLabelVisible:false }));
-
+const main = LW.createChart($('chart'), { autoSize:true, ...chartOpts() });
+let mainSeries = null, lastMain = { v:null, up:true };
 function makeMain() {
   const t = state.type;
-  if (t === 'candles' || t === 'heikin')
-    mainSeries = main.addCandlestickSeries({ upColor:C.up, downColor:C.down, borderUpColor:C.up, borderDownColor:C.down, wickUpColor:C.up, wickDownColor:C.down });
+  const candle = { upColor:C.up, downColor:C.down, borderUpColor:C.up, borderDownColor:C.down, wickUpColor:C.up, wickDownColor:C.down };
+  if (t === 'candles' || t === 'heikin') mainSeries = main.addCandlestickSeries(candle);
+  else if (t === 'hollow') mainSeries = main.addCandlestickSeries({ ...candle, upColor:'rgba(0,0,0,0)' });
   else if (t === 'bars') mainSeries = main.addBarSeries({ upColor:C.up, downColor:C.down, thinBars:false });
   else if (t === 'line') mainSeries = main.addLineSeries({ color:C.accent, lineWidth:2 });
-  else mainSeries = main.addAreaSeries({ lineColor:C.accent, topColor:alpha(C.accent, .32), bottomColor:alpha(C.accent, 0), lineWidth:2 });
+  else if (t === 'area') mainSeries = main.addAreaSeries({ lineColor:C.accent, topColor:alpha(C.accent, .3), bottomColor:alpha(C.accent, 0), lineWidth:2 });
+  else mainSeries = main.addBaselineSeries({ baseValue:{ type:'price', price:price[state.sym] },
+    topLineColor:C.up, topFillColor1:alpha(C.up, .28), topFillColor2:alpha(C.up, .04),
+    bottomLineColor:C.down, bottomFillColor1:alpha(C.down, .04), bottomFillColor2:alpha(C.down, .28) });
+  alertLines = [];
 }
 function mainData(bars) {
   if (state.type === 'heikin') return heikin(bars);
-  if (state.type === 'line' || state.type === 'area') return bars.map(b => ({ time:b.time, value:b.close }));
+  if (['line', 'area', 'baseline'].includes(state.type)) return bars.map(b => ({ time:b.time, value:b.close }));
   return bars.map(({ time, open, high, low, close }) => ({ time, open, high, low, close }));
 }
-const volPoint = b => ({ time:b.time, value:b.volume, color:alpha(b.close >= b.open ? C.up : C.down, .45) });
-
+function noteLast(pt, bar) { lastMain = { v:pt.close ?? pt.value, up:pt.open != null ? pt.close >= pt.open : bar.close >= bar.open }; }
+const pfPrice = () => { const d = prec(); return { type:'price', precision:d, minMove:Math.pow(10, -d) }; };
 function applyPrecision() {
-  const d = BY[state.sym].d, pf = { type:'price', precision:d, minMove:Math.pow(10, -d) };
-  mainSeries.applyOptions({ priceFormat:pf });
-  Object.values(ind).forEach(s => s.applyOptions({ priceFormat:pf }));
+  mainSeries.applyOptions({ priceFormat:pfPrice() });
+  for (const r of rt.values()) if (!DEF[r.cfg.type].pane && r.cfg.type !== 'vol') r.series.forEach(s => s.applyOptions({ priceFormat:pfPrice() }));
 }
-function applyVisibility() {
-  const v = state.ind;
-  ind.ma20.applyOptions({ visible:v.ma20 }); ind.ma50.applyOptions({ visible:v.ma50 }); ind.ema200.applyOptions({ visible:v.ema200 });
-  ['bbU', 'bbM', 'bbL'].forEach(k => ind[k].applyOptions({ visible:v.bb }));
-  volS.applyOptions({ visible:v.vol });
-  main.priceScale('right').applyOptions({ scaleMargins:{ top:0.12, bottom:v.vol ? 0.22 : 0.06 } });
-  $('rsiWrap').hidden = !v.rsi;
+function applyScale() {
+  const mode = state.scale === 'log' ? LW.PriceScaleMode.Logarithmic : state.scale === 'pct' ? LW.PriceScaleMode.Percentage : LW.PriceScaleMode.Normal;
+  main.priceScale('right').applyOptions({ mode });
+  $('pctBtn').setAttribute('aria-pressed', state.scale === 'pct'); $('logBtn').setAttribute('aria-pressed', state.scale === 'log');
+}
+function applyMainMargins() {
+  const hasVol = state.inds.some(c => c.type === 'vol' && !c.hidden);
+  main.priceScale('right').applyOptions({ scaleMargins:{ top:0.12, bottom:hasVol ? 0.2 : 0.06 } });
 }
 
+// ---------- 지표 런타임 ----------
+const rt = new Map();
+const skip = new WeakMap();
+let syncing = false, hoverIdx = null;
+const allCharts = () => [main, ...[...rt.values()].filter(r => r.pane).map(r => r.pane.chart)];
+function seriesFor(chart) {
+  if (chart === main) return { s:mainSeries, val:i => getBars()[i]?.close };
+  for (const r of rt.values()) if (r.pane && r.pane.chart === chart) { const k = r.cfg.type === 'macd' ? 1 : 0; return { s:r.series[k], val:i => r.data[k]?.[i]?.value ?? 0 }; }
+}
+function hookChart(ch) {
+  ch.timeScale().subscribeVisibleLogicalRangeChange(r => {
+    if (syncing || !r) return; syncing = true;
+    for (const o of allCharts()) if (o !== ch) o.timeScale().setVisibleLogicalRange(r);
+    syncing = false;
+  });
+  ch.subscribeCrosshairMove(p => {
+    if (skip.get(ch)) { skip.set(ch, false); return; }
+    hoverIdx = p.time != null && barIndex.has(p.time) ? barIndex.get(p.time) : null;
+    updateLegend();
+    for (const o of allCharts()) {
+      if (o === ch) continue;
+      try {
+        if (hoverIdx == null) { if (o.clearCrosshairPosition) { skip.set(o, true); o.clearCrosshairPosition(); } }
+        else if (o.setCrosshairPosition) { const t = seriesFor(o); skip.set(o, true); o.setCrosshairPosition(t.val(hoverIdx), p.time, t.s); }
+      } catch (e) {}
+    }
+  });
+}
+hookChart(main);
+
+function makePane(cfg) {
+  const box = el('div', 'pane'); box.style.height = (cfg.h || (isMobile() ? 96 : 120)) + 'px';
+  const grip = el('div', 'grip'); const leg = el('div', 'legend'); const ch = el('div', 'pane-chart');
+  box.append(grip, leg, ch); $('panes').append(box);
+  grip.addEventListener('pointerdown', e => {
+    e.preventDefault(); grip.setPointerCapture(e.pointerId);
+    const y0 = e.clientY, h0 = box.offsetHeight;
+    const mv = ev => { const hh = Math.max(60, Math.min(420, h0 - (ev.clientY - y0))); box.style.height = hh + 'px'; cfg.h = hh; };
+    const up = () => { grip.removeEventListener('pointermove', mv); grip.removeEventListener('pointerup', up); savePrefs(); };
+    grip.addEventListener('pointermove', mv); grip.addEventListener('pointerup', up);
+  });
+  const chart = LW.createChart(ch, { autoSize:true, ...chartOpts() });
+  chart.priceScale('right').applyOptions({ scaleMargins:{ top:0.14, bottom:0.08 } });
+  hookChart(chart);
+  return { el:box, leg, chart };
+}
+function addRuntime(cfg) {
+  const def = DEF[cfg.type], r = { cfg, series:[], colors:[], data:[] };
+  if (def.pane) r.pane = makePane(cfg);
+  const chart = r.pane ? r.pane.chart : main;
+  const c0 = pal(cfg.c || 0);
+  const pf = def.pane ? { type:'price', precision:2, minMove:0.01 } : pfPrice();
+  const line = (color, extra = {}) => { r.colors.push(color); return chart.addLineSeries({ color, lineWidth:1.5, priceLineVisible:false, lastValueVisible:true, crosshairMarkerVisible:false, priceFormat:pf, ...extra }); };
+  const fixed = { autoscaleInfoProvider:() => ({ priceRange:{ minValue:0, maxValue:100 } }) };
+  const guides = (s, a, b) => [a, b].forEach(p => s.createPriceLine({ price:p, color:C.muted, lineWidth:1, lineStyle:LW.LineStyle.Dashed, axisLabelVisible:false }));
+  switch (cfg.type) {
+    case 'sma': case 'ema': r.series = [line(c0)]; break;
+    case 'bb': r.series = [line(c0, { lineWidth:1 }), line(pal((cfg.c || 0) + 5), { lineWidth:1, lineStyle:LW.LineStyle.Dashed }), line(c0, { lineWidth:1 })]; break;
+    case 'vol':
+      r.colors.push(C.muted);
+      r.series = [main.addHistogramSeries({ priceScaleId:'vol', priceFormat:{ type:'volume' }, lastValueVisible:false, priceLineVisible:false })];
+      main.priceScale('vol').applyOptions({ scaleMargins:{ top:0.8, bottom:0 } }); break;
+    case 'rsi': { const s = line(c0, fixed); guides(s, 70, 30); r.series = [s]; break; }
+    case 'macd':
+      r.colors.push(C.muted);
+      r.series = [chart.addHistogramSeries({ priceFormat:pf, priceLineVisible:false, lastValueVisible:false }), line(C.accent), line(pal(5))]; break;
+    case 'stoch': { const k = line(C.accent, fixed); guides(k, 80, 20); r.series = [k, line(pal(5), fixed)]; break; }
+  }
+  r.series.forEach(s => s.applyOptions({ visible:!cfg.hidden }));
+  rt.set(cfg.id, r);
+  return r;
+}
+function removeRuntime(r) {
+  if (r.pane) { r.pane.chart.remove(); r.pane.el.remove(); }
+  else r.series.forEach(s => main.removeSeries(s));
+  rt.delete(r.cfg.id);
+}
+const volPoint = b => ({ time:b.time, value:b.volume, color:alpha(b.close >= b.open ? C.up : C.down, .42) });
+function compute(cfg, bars) {
+  const cl = bars.map(b => b.close), L = v => toLine(bars, v), p = cfg.p;
+  switch (cfg.type) {
+    case 'sma': return [L(sma(cl, p.len))];
+    case 'ema': return [L(ema(cl, p.len))];
+    case 'bb': { const b = boll(cl, p.len, p.mult); return [L(b.up), L(b.mid), L(b.lo)]; }
+    case 'vol': return [bars.map(volPoint)];
+    case 'rsi': return [L(rsi(cl, p.len))];
+    case 'macd': { const m = macd(cl, p.fast, p.slow, p.sig);
+      const hist = bars.map((b, i) => { const v = m.hist[i]; if (v == null) return { time:b.time };
+        const fading = i > 0 && m.hist[i - 1] != null && Math.abs(v) < Math.abs(m.hist[i - 1]);
+        return { time:b.time, value:v, color:alpha(v >= 0 ? C.up : C.down, fading ? .45 : .9) }; });
+      return [hist, L(m.m), L(m.sig)]; }
+    case 'stoch': { const s = stoch(bars, p.k, p.smooth, p.d); return [L(s.K), L(s.D)]; }
+  }
+}
+function updateTimeAxes() {
+  const cs = allCharts();
+  cs.forEach((c, i) => c.applyOptions({ timeScale:{ visible:i === cs.length - 1 } }));
+}
+
+// ---------- 렌더링 ----------
 let barIndex = new Map();
 function renderAll(fit) {
   const bars = getBars(); catchUp(state.sym, state.tf, bars);
-  const cl = closes(bars), b = boll(cl);
-  mainSeries.setData(mainData(bars));
-  volS.setData(bars.map(volPoint));
-  ind.ma20.setData(toLine(bars, sma(cl, 20)));
-  ind.ma50.setData(toLine(bars, sma(cl, 50)));
-  ind.ema200.setData(toLine(bars, ema(cl, 200)));
-  ind.bbU.setData(toLine(bars, b.up)); ind.bbM.setData(toLine(bars, b.mid)); ind.bbL.setData(toLine(bars, b.lo));
-  rsiS.setData(toLine(bars, rsi(cl)));
-  barIndex = new Map(bars.map((x, i) => [x.time, i]));
-  if (fit) main.timeScale().setVisibleLogicalRange({ from:bars.length - 160, to:bars.length + 6 });
-  showLegend();
+  if (state.type === 'baseline') { const sl = bars.slice(-200); mainSeries.applyOptions({ baseValue:{ type:'price', price:sl.reduce((a, b) => a + b.close, 0) / sl.length } }); }
+  const md = mainData(bars); mainSeries.setData(md); noteLast(md[md.length - 1], bars[bars.length - 1]);
+  for (const r of rt.values()) { r.data = compute(r.cfg, bars); r.data.forEach((d, k) => r.series[k].setData(d)); }
+  barIndex = new Map(bars.map((b, i) => [b.time, i]));
+  if (fit) { const n = bars.length; main.timeScale().setVisibleLogicalRange({ from:n - (isMobile() ? 90 : 170), to:n + 8 }); }
+  const vr = main.timeScale().getVisibleLogicalRange();
+  if (vr) for (const o of allCharts()) if (o !== main) o.timeScale().setVisibleLogicalRange(vr);
+  refreshAlertLines(); updateLegend();
 }
 function updateLast() {
-  const bars = getBars();
-  const added = catchUp(state.sym, state.tf, bars);
+  const bars = getBars(), added = catchUp(state.sym, state.tf, bars);
   if (added > 1) return renderAll(false);
-  const n = bars.length, last = bars[n - 1], cl = closes(bars);
-  const md = state.type === 'heikin' ? heikin(bars.slice(-60)).pop() : mainData([last])[0];
-  mainSeries.update(md);
-  volS.update(volPoint(last));
-  const pt = (s, vals) => { const v = vals[n - 1]; if (v != null) s.update({ time:last.time, value:v }); };
-  pt(ind.ma20, sma(cl, 20)); pt(ind.ma50, sma(cl, 50)); pt(ind.ema200, ema(cl, 200));
-  const b = boll(cl.slice(-20)), k = 19;
-  if (b.mid[k] != null) { ind.bbU.update({ time:last.time, value:b.up[k] }); ind.bbM.update({ time:last.time, value:b.mid[k] }); ind.bbL.update({ time:last.time, value:b.lo[k] }); }
-  pt(rsiS, rsi(cl));
+  const n = bars.length, last = bars[n - 1];
+  const md = state.type === 'heikin' ? heikin(bars.slice(-120)).pop() : mainData([last])[0];
+  mainSeries.update(md); noteLast(md, last);
+  for (const r of rt.values()) {
+    r.data = compute(r.cfg, bars);
+    r.data.forEach((d, k) => { const p = d[n - 1]; if (p && p.value != null) r.series[k].update(p); });
+  }
   if (added) barIndex.set(last.time, n - 1);
 }
 
-// 가격·RSI 패널 시간축 동기화
-let syncing = false;
-const sync = (a, b) => a.timeScale().subscribeVisibleLogicalRangeChange(r => {
-  if (syncing || !r) return; syncing = true; b.timeScale().setVisibleLogicalRange(r); syncing = false;
-});
-sync(main, rsiC); sync(rsiC, main);
-
 // ---------- 범례 ----------
-const fmt = (v, d = BY[state.sym].d) => v == null || isNaN(v) ? '—' : v.toLocaleString('en-US', { minimumFractionDigits:d, maximumFractionDigits:d });
-const fmtVol = v => v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(2) + 'K' : v.toFixed(0);
-let hoverTime = null;
-function showLegend() {
-  const bars = getBars();
-  const i = hoverTime != null && barIndex.has(hoverTime) ? barIndex.get(hoverTime) : bars.length - 1;
-  const b = bars[i], p = bars[i - 1] || b, cl = closes(bars);
-  const ch = b.close - p.close, pct = ch / p.close * 100, cls = ch >= 0 ? 'up' : 'down';
+function legendRow(r) {
+  const row = el('div', 'lrow' + (r.cfg.hidden ? ' off' : ''));
+  row.dataset.id = r.cfg.id;
+  row.innerHTML = `<span class="lname">${indLabel(r.cfg)}</span><span class="lvals num"></span>
+    <span class="lbtns"><button data-act="hide" aria-label="숨기기/보이기" title="숨기기/보이기">${r.cfg.hidden ? I.eyeOff : I.eye}</button>${Object.keys(r.cfg.p).length ? `<button data-act="set" aria-label="설정" title="설정">${I.gear}</button>` : ''}<button data-act="del" aria-label="삭제" title="삭제">${I.close}</button></span>`;
+  r.valEl = row.querySelector('.lvals');
+  return row;
+}
+function buildLegends() {
+  const rows = $('lgRows'); rows.innerHTML = '';
+  for (const r of rt.values()) {
+    if (r.pane) { r.pane.leg.innerHTML = ''; r.pane.leg.append(legendRow(r)); }
+    else rows.append(legendRow(r));
+  }
+  $('legend').classList.toggle('collapsed', !!state.legendCollapsed);
+  $('lgCollapse').innerHTML = I.caret;
+  $('lgCollapse').hidden = !rows.children.length;
   const s = BY[state.sym];
-  const at = (arr) => fmt(arr[i]);
-  const parts = [];
-  if (state.ind.ma20) parts.push(`<span style="color:${C.ma20}">MA 20 ${at(sma(cl, 20))}</span>`);
-  if (state.ind.ma50) parts.push(`<span style="color:${C.ma50}">MA 50 ${at(sma(cl, 50))}</span>`);
-  if (state.ind.ema200) parts.push(`<span style="color:${C.ema}">EMA 200 ${at(ema(cl, 200))}</span>`);
-  if (state.ind.bb) { const bb = boll(cl); parts.push(`<span style="color:${C.bb}">BB 20 2 ${at(bb.up)} ${at(bb.mid)} ${at(bb.lo)}</span>`); }
-  $('legend').innerHTML =
-    `<div class="l1"><span class="title">${s.s} · ${state.tf}</span>
-      <span class="num"><span class="k">O</span><span class="${cls}">${fmt(b.open)}</span></span>
-      <span class="num"><span class="k">H</span><span class="${cls}">${fmt(b.high)}</span></span>
-      <span class="num"><span class="k">L</span><span class="${cls}">${fmt(b.low)}</span></span>
-      <span class="num"><span class="k">C</span><span class="${cls}">${fmt(b.close)}</span></span>
-      <span class="num ${cls}">${ch >= 0 ? '+' : ''}${fmt(ch)} (${ch >= 0 ? '+' : ''}${pct.toFixed(2)}%)</span>
-      ${state.ind.vol && s.vb ? `<span class="num"><span class="k">Vol</span>${fmtVol(b.volume)}</span>` : ''}</div>
-     <div class="ind num">${parts.join('')}</div>`;
-  const r = rsi(cl)[i];
-  $('rsiLabel').innerHTML = `RSI 14 <span class="num" style="color:${C.ma50}">${r == null ? '—' : r.toFixed(2)}</span>`;
+  $('lgTitle').textContent = `${s.n} · ${TF[state.tf].sh} · ${s.x}`;
 }
-main.subscribeCrosshairMove(p => { hoverTime = p && p.time != null ? p.time : null; showLegend(); });
-
-// ---------- 그리기 도구 ----------
-let drawObjs = [], pending = null;
-const dKey = () => state.sym + '|' + state.tf;
-function clearDrawObjs() {
-  drawObjs.forEach(o => o.pl ? mainSeries.removePriceLine(o.pl) : main.removeSeries(o.s));
-  drawObjs = [];
-}
-function drawOne(d) {
-  if (d.t === 'h') {
-    drawObjs.push({ pl:mainSeries.createPriceLine({ price:d.price, color:C.accent, lineWidth:1, lineStyle:LW.LineStyle.Solid, axisLabelVisible:true }) });
-  } else {
-    const s = main.addLineSeries({ color:C.accent, lineWidth:2, lastValueVisible:false, priceLineVisible:false, crosshairMarkerVisible:false });
-    s.setData([d.a, d.b].sort((x, y) => x.time - y.time));
-    drawObjs.push({ s });
+function updateLegend() {
+  const bars = getBars(); if (!bars.length) return;
+  const i = hoverIdx ?? bars.length - 1, b = bars[i], p = bars[i - 1] || b;
+  const ch = b.close - p.close, cls = ch >= 0 ? 'up' : 'down';
+  $('lgOHLC').innerHTML = `<span><span class="k">시</span><span class="${cls}">${fmt(b.open)}</span></span>
+    <span><span class="k">고</span><span class="${cls}">${fmt(b.high)}</span></span>
+    <span><span class="k">저</span><span class="${cls}">${fmt(b.low)}</span></span>
+    <span><span class="k">종</span><span class="${cls}">${fmt(b.close)}</span></span>
+    <span class="${cls}">${sign(ch)}${fmt(Math.abs(ch))} (${sign(ch)}${Math.abs(ch / p.close * 100).toFixed(2)}%)</span>`;
+  for (const r of rt.values()) {
+    if (!r.valEl) continue;
+    const pane = DEF[r.cfg.type].pane;
+    r.valEl.innerHTML = r.data.map((d, k) => {
+      const v = d[i]?.value;
+      const txt = v == null ? '—' : r.cfg.type === 'vol' ? fmtVol(v) : pane ? v.toFixed(2) : fmt(v);
+      const c = r.cfg.type === 'vol' ? (b.close >= b.open ? C.up : C.down) : r.cfg.type === 'macd' && k === 0 ? (v >= 0 ? C.up : C.down) : r.colors[k];
+      return `<span style="color:${c}">${txt}</span>`;
+    }).join('');
   }
 }
-function drawAll() { clearDrawObjs(); (drawings[dKey()] || []).forEach(drawOne); }
-function addDrawing(d) { (drawings[dKey()] ||= []).push(d); store.set('drawings', drawings); drawOne(d); }
-
-function setTool(t) {
-  state.tool = t; pending = null;
-  document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === t));
-  hint(t === 'trend' ? '추세선: 시작점을 클릭하세요' : t === 'hline' ? '수평선: 원하는 가격을 클릭하세요' : '');
-}
-let hintTimer;
-function hint(msg, ms) {
-  clearTimeout(hintTimer); $('hint').textContent = msg; $('hint').hidden = !msg;
-  if (ms) hintTimer = setTimeout(() => $('hint').hidden = true, ms);
-}
-main.subscribeClick(p => {
-  if (state.tool === 'cursor' || !p.point) return;
-  const pr = mainSeries.coordinateToPrice(p.point.y);
-  if (pr == null) return;
-  if (state.tool === 'hline') { addDrawing({ t:'h', price:pr }); setTool('cursor'); hint('수평선을 추가했습니다', 1500); return; }
-  if (p.time == null) return;
-  if (!pending) { pending = { time:p.time, value:pr }; hint('추세선: 끝점을 클릭하세요'); return; }
-  if (p.time !== pending.time) { addDrawing({ t:'l', a:pending, b:{ time:p.time, value:pr } }); hint('추세선을 추가했습니다', 1500); }
-  else hint('시작점과 다른 봉을 클릭하세요', 1800);
-  const keep = p.time === pending.time;
-  if (!keep) setTool('cursor');
+$('lgCollapse').addEventListener('click', () => { state.legendCollapsed = !state.legendCollapsed; $('legend').classList.toggle('collapsed', state.legendCollapsed); savePrefs(); });
+document.addEventListener('click', e => {
+  const b = e.target.closest('.lrow [data-act]'); if (!b) return;
+  const id = +b.closest('.lrow').dataset.id, r = rt.get(id); if (!r) return;
+  if (b.dataset.act === 'del') removeIndicator(id);
+  else if (b.dataset.act === 'hide') {
+    r.cfg.hidden = !r.cfg.hidden; r.series.forEach(s => s.applyOptions({ visible:!r.cfg.hidden }));
+    if (r.cfg.type === 'vol') applyMainMargins();
+    buildLegends(); updateLegend(); savePrefs();
+  } else openSettings(r, b);
 });
-document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
-$('clearBtn').addEventListener('click', () => { delete drawings[dKey()]; store.set('drawings', drawings); clearDrawObjs(); hint('이 차트의 그림을 지웠습니다', 1500); });
-$('fitBtn').addEventListener('click', () => { const n = getBars().length; main.timeScale().setVisibleLogicalRange({ from:n - 160, to:n + 6 }); main.priceScale('right').applyOptions({ autoScale:true }); });
-addEventListener('keydown', e => { if (e.key === 'Escape') setTool('cursor'); });
 
-// ---------- 상단 컨트롤 ----------
-SYMBOLS.forEach(s => $('symSel').add(new Option(`${s.s} · ${s.n}`, s.s)));
-Object.keys(TF).forEach(t => { const b = document.createElement('button'); b.textContent = t; b.dataset.tf = t; $('tfSeg').append(b); });
-const IND = [['ma20', 'MA 20', 'ma20'], ['ma50', 'MA 50', 'ma50'], ['ema200', 'EMA 200', 'ema'], ['bb', '볼린저', 'bb'], ['vol', '거래량', 'muted'], ['rsi', 'RSI', 'ma50']];
-IND.forEach(([k, label]) => { const b = document.createElement('button'); b.className = 'chip'; b.dataset.ind = k; b.innerHTML = `<i></i>${label}`; $('indSeg').append(b); });
-
-function paintControls() {
-  $('symSel').value = state.sym; $('typeSel').value = state.type;
-  document.querySelectorAll('[data-tf]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tf === state.tf));
-  document.querySelectorAll('[data-ind]').forEach(b => {
-    b.setAttribute('aria-pressed', !!state.ind[b.dataset.ind]);
-    b.querySelector('i').style.background = C[IND.find(x => x[0] === b.dataset.ind)[2]];
+// ---------- 지표 추가/삭제/설정 ----------
+function addIndicator(type) {
+  if (type === 'vol' && state.inds.some(c => c.type === 'vol')) { toast('거래량은 이미 차트에 있습니다.'); return; }
+  const used = state.inds.filter(c => c.c != null).length;
+  const cfg = { id:state.nextId++, type, p:{ ...DEF[type].params }, c:used % 6 };
+  if (type === 'sma' && state.inds.some(c => c.type === 'sma' && c.p.len === 20)) cfg.p.len = state.inds.some(c => c.type === 'sma' && c.p.len === 50) ? 200 : 50;
+  state.inds.push(cfg);
+  const r = addRuntime(cfg); const bars = getBars();
+  r.data = compute(cfg, bars); r.data.forEach((d, k) => r.series[k].setData(d));
+  if (r.pane) { const vr = main.timeScale().getVisibleLogicalRange(); if (vr) r.pane.chart.timeScale().setVisibleLogicalRange(vr); }
+  updateTimeAxes(); applyMainMargins(); buildLegends(); updateLegend(); savePrefs();
+  return cfg;
+}
+function removeIndicator(id) {
+  const r = rt.get(id); if (!r) return;
+  closePop(); removeRuntime(r); state.inds = state.inds.filter(c => c.id !== id);
+  updateTimeAxes(); applyMainMargins(); buildLegends(); updateLegend(); savePrefs(); renderIndList();
+}
+let popEl = null;
+function closePop() { if (popEl) { popEl.remove(); popEl = null; } }
+function openSettings(r, anchor) {
+  closePop();
+  const p = el('div', 'pop'); p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', indLabel(r.cfg) + ' 설정');
+  p.innerHTML = `<h4>${DEF[r.cfg.type].name}</h4>` + Object.entries(r.cfg.p).map(([k, v]) =>
+    `<label for="pp-${k}">${PLBL[k] || k}<input id="pp-${k}" data-k="${k}" type="number" min="1" max="500" step="${k === 'mult' ? 0.1 : 1}" value="${v}"></label>`).join('')
+    + (DEF[r.cfg.type].pane || r.cfg.type === 'vol' ? '' : `<div class="sws">${[0,1,2,3,4,5].map(i => `<button class="swatch" data-c="${i}" aria-label="색 ${i + 1}" aria-pressed="${(r.cfg.c || 0) === i}" style="background:${pal(i)}"></button>`).join('')}</div>`);
+  document.body.append(p); popEl = p;
+  const a = anchor.getBoundingClientRect();
+  p.style.left = Math.max(8, Math.min(a.left, innerWidth - p.offsetWidth - 8)) + 'px';
+  p.style.top = Math.min(a.bottom + 6, innerHeight - p.offsetHeight - 8) + 'px';
+  p.addEventListener('input', e => {
+    const k = e.target.dataset.k; if (!k) return;
+    let v = parseFloat(e.target.value); if (!(v > 0)) return;
+    if (k !== 'mult') v = Math.round(v);
+    r.cfg.p[k] = Math.min(500, v); refreshIndicator(r);
   });
-  document.querySelectorAll('.row').forEach(r => r.setAttribute('aria-current', r.dataset.sym === state.sym));
-  store.set('prefs', { sym:state.sym, tf:state.tf, type:state.type, ind:state.ind });
+  p.addEventListener('click', e => {
+    const s = e.target.closest('[data-c]'); if (!s) return;
+    r.cfg.c = +s.dataset.c; p.querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', x === s)); refreshIndicator(r, true);
+  });
+  p.querySelector('input')?.focus();
 }
-function switchTo(changes) {
-  clearDrawObjs(); setTool('cursor');
-  Object.assign(state, changes);
-  applyPrecision(); renderAll(true); drawAll(); paintControls(); updateQuote();
+function refreshIndicator(r, recolor) {
+  if (recolor) {
+    const idx = state.inds.indexOf(r.cfg); removeRuntime(r);
+    const nr = addRuntime(r.cfg);
+    // 원래 순서 유지
+    const entries = [...rt.entries()].sort((a, b) => state.inds.findIndex(c => c.id === a[0]) - state.inds.findIndex(c => c.id === b[0]));
+    rt.clear(); entries.forEach(([k, v]) => rt.set(k, v)); void idx; r = nr;
+  }
+  const bars = getBars(); r.data = compute(r.cfg, bars); r.data.forEach((d, k) => r.series[k].setData(d));
+  buildLegends(); updateLegend(); savePrefs();
 }
-$('symSel').addEventListener('change', e => switchTo({ sym:e.target.value }));
-$('tfSeg').addEventListener('click', e => { const t = e.target.closest('[data-tf]'); if (t) switchTo({ tf:t.dataset.tf }); });
-$('typeSel').addEventListener('change', e => {
-  clearDrawObjs(); main.removeSeries(mainSeries); state.type = e.target.value; makeMain();
-  applyPrecision(); renderAll(false); drawAll(); paintControls();
-});
-$('indSeg').addEventListener('click', e => {
-  const b = e.target.closest('[data-ind]'); if (!b) return;
-  state.ind[b.dataset.ind] = !state.ind[b.dataset.ind]; applyVisibility(); paintControls(); showLegend();
-});
 
-// ---------- 관심종목 ----------
-SYMBOLS.forEach(s => {
-  const r = document.createElement('div'); r.className = 'row'; r.dataset.sym = s.s; r.tabIndex = 0; r.setAttribute('role', 'button');
-  r.innerHTML = `<div style="min-width:0"><div class="s">${s.s}</div><div class="n">${s.n}</div></div><span class="num p"></span><span class="num c"></span>`;
-  r.addEventListener('click', () => switchTo({ sym:s.s }));
-  r.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTo({ sym:s.s }); } });
-  $('list').append(r);
-});
-const lastShown = {};
-function updateList() {
-  document.querySelectorAll('.row').forEach(r => {
-    const k = r.dataset.sym, s = BY[k], p = price[k], ch = (p / prevClose[k] - 1) * 100;
-    const pe = r.querySelector('.p'), ce = r.querySelector('.c');
-    pe.textContent = fmt(p, s.d);
-    if (lastShown[k] != null && p !== lastShown[k]) {
-      pe.classList.remove('flash-up', 'flash-down'); void pe.offsetWidth;
-      pe.classList.add(p > lastShown[k] ? 'flash-up' : 'flash-down');
-      setTimeout(() => pe.classList.remove('flash-up', 'flash-down'), 250);
+// ---------- 그리기 ----------
+const wrap = $('wrap'), cv = $('draw'), dc = cv.getContext('2d');
+const dKey = () => state.sym + '|' + state.tf;
+const list = () => drawings[dKey()] || (drawings[dKey()] = []);
+const saveDrawings = () => store.set('drawings', drawings);
+let sel = null, drag = null, draft = null, swallow = false;
+const ONE = new Set(['hline', 'vline']);
+const TWO = new Set(['trend', 'ray', 'rect', 'fib', 'measure']);
+const FIB = [0, .236, .382, .5, .618, .786, 1];
+const FIBC = ['muted', 'down', 'i5', 'i4', 'i3', 'accent', 'muted'];
+
+function pane() {
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const tv = allCharts().length === 1;
+  return { W, H, pw:W - main.priceScale('right').width(), ph:H - (tv ? main.timeScale().height() : 0) };
+}
+function toXY(pt) {
+  const x = main.timeScale().logicalToCoordinate(pt.l), y = mainSeries.priceToCoordinate(pt.p);
+  return x == null || y == null ? null : { x, y };
+}
+function fromXY(x, y, snap) {
+  let l = main.timeScale().coordinateToLogical(x), p = mainSeries.coordinateToPrice(y);
+  if (l == null || p == null) return null;
+  if (snap && state.magnet) {
+    const bars = getBars(), i = Math.round(l);
+    if (i >= 0 && i < bars.length) {
+      const b = bars[i]; let best = p, bd = Infinity;
+      for (const v of [b.open, b.high, b.low, b.close]) { const yy = mainSeries.priceToCoordinate(v); if (yy != null && Math.abs(yy - y) < bd) { bd = Math.abs(yy - y); best = v; } }
+      l = i; p = best;
     }
-    lastShown[k] = p;
-    ce.textContent = (ch >= 0 ? '+' : '') + ch.toFixed(2) + '%';
-    ce.className = 'num c ' + (ch >= 0 ? 'up' : 'down');
+  }
+  return { l, p };
+}
+const segDist = (p, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy; let t = L ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / L : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)); };
+const rayEnd = (a, b) => { const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1; return { x:a.x + dx / L * 6000, y:a.y + dy / L * 6000 }; };
+function handlesOf(d, P, pw, ph) {
+  if (d.type === 'hline') return [{ x:Math.max(12, Math.min(pw - 12, P[0].x)), y:P[0].y }];
+  if (d.type === 'vline') return [{ x:P[0].x, y:ph / 2 }];
+  return P;
+}
+function onShape(d, P, q, tol) {
+  switch (d.type) {
+    case 'trend': return segDist(q, P[0], P[1]) <= tol;
+    case 'ray': return segDist(q, P[0], rayEnd(P[0], P[1])) <= tol;
+    case 'hline': return Math.abs(q.y - P[0].y) <= tol;
+    case 'vline': return Math.abs(q.x - P[0].x) <= tol;
+    default: {
+      const x0 = Math.min(P[0].x, P[1].x) - tol, x1 = Math.max(P[0].x, P[1].x) + tol, y0 = Math.min(P[0].y, P[1].y) - tol, y1 = Math.max(P[0].y, P[1].y) + tol;
+      return q.x >= x0 && q.x <= x1 && q.y >= y0 && q.y <= y1;
+    }
+  }
+}
+function hit(x, y) {
+  const tol = coarse() ? 14 : 6, { pw, ph } = pane(), arr = list(), q = { x, y };
+  for (let k = arr.length - 1; k >= 0; k--) {
+    const d = arr[k], P = d.pts.map(toXY); if (P.some(p => !p)) continue;
+    const hs = handlesOf(d, P, pw, ph);
+    if (d === sel) for (let i = 0; i < hs.length; i++) if (Math.hypot(hs[i].x - x, hs[i].y - y) <= tol + 3) return { d, handle:i };
+    if (onShape(d, P, q, tol)) return { d, handle:-1 };
+  }
+  return null;
+}
+
+function label(x, y, text, bg, fg, align = 'center') {
+  dc.font = `500 11px ${getComputedStyle(document.body).getPropertyValue('--mono') || 'monospace'}`;
+  const w = dc.measureText(text).width + 10, h = 18;
+  const lx = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x;
+  dc.fillStyle = bg; dc.beginPath(); dc.roundRect ? dc.roundRect(lx, y - h / 2, w, h, 3) : dc.rect(lx, y - h / 2, w, h); dc.fill();
+  dc.fillStyle = fg; dc.textBaseline = 'middle'; dc.textAlign = 'left'; dc.fillText(text, lx + 5, y + 0.5);
+}
+function seg(a, b) { dc.beginPath(); dc.moveTo(a.x, a.y); dc.lineTo(b.x, b.y); dc.stroke(); }
+function drawShape(d, selected, pw, ph) {
+  const P = d.pts.map(toXY); if (P.some(p => !p)) return;
+  const c = col(d.color || 'accent');
+  dc.strokeStyle = c; dc.fillStyle = c; dc.lineWidth = selected ? 2 : 1.5; dc.setLineDash([]);
+  switch (d.type) {
+    case 'trend': seg(P[0], P[1]); break;
+    case 'ray': seg(P[0], rayEnd(P[0], P[1])); break;
+    case 'hline': seg({ x:0, y:P[0].y }, { x:pw, y:P[0].y }); break;
+    case 'vline': seg({ x:P[0].x, y:0 }, { x:P[0].x, y:ph }); break;
+    case 'rect': {
+      const x = Math.min(P[0].x, P[1].x), y = Math.min(P[0].y, P[1].y), w = Math.abs(P[1].x - P[0].x), h = Math.abs(P[1].y - P[0].y);
+      dc.fillStyle = alpha(c, .12); dc.fillRect(x, y, w, h); dc.strokeRect(x, y, w, h); break;
+    }
+    case 'fib': {
+      const x0 = Math.min(P[0].x, P[1].x), x1 = Math.max(P[0].x, P[1].x);
+      const lv = FIB.map(f => { const pr = d.pts[1].p + (d.pts[0].p - d.pts[1].p) * f; return { f, pr, y:mainSeries.priceToCoordinate(pr) }; });
+      if (lv.some(v => v.y == null)) break;
+      for (let i = 0; i < lv.length - 1; i++) { dc.fillStyle = alpha(col(FIBC[i + 1]), .08); dc.fillRect(x0, Math.min(lv[i].y, lv[i + 1].y), x1 - x0, Math.abs(lv[i + 1].y - lv[i].y)); }
+      dc.lineWidth = 1;
+      lv.forEach((v, i) => {
+        dc.strokeStyle = col(FIBC[i]); seg({ x:x0, y:v.y }, { x:x1, y:v.y });
+        dc.font = `11px ${getComputedStyle(document.body).getPropertyValue('--mono') || 'monospace'}`; dc.fillStyle = col(FIBC[i]); dc.textAlign = 'left'; dc.textBaseline = 'bottom';
+        dc.fillText(`${v.f} (${fmt(v.pr)})`, x0 + 4, v.y - 2);
+      });
+      dc.strokeStyle = alpha(C.muted, .8); dc.setLineDash([4, 4]); seg(P[0], P[1]); dc.setLineDash([]); break;
+    }
+    case 'measure': {
+      const dp = d.pts[1].p - d.pts[0].p, up = dp >= 0, mc = up ? C.accent : C.down;
+      const x = Math.min(P[0].x, P[1].x), y = Math.min(P[0].y, P[1].y), w = Math.abs(P[1].x - P[0].x), h = Math.abs(P[1].y - P[0].y);
+      dc.fillStyle = alpha(mc, .15); dc.fillRect(x, y, w, h);
+      dc.strokeStyle = mc; dc.lineWidth = 1.2;
+      const mx = (P[0].x + P[1].x) / 2, my = (P[0].y + P[1].y) / 2;
+      seg({ x:mx, y:P[0].y }, { x:mx, y:P[1].y }); seg({ x:P[0].x, y:my }, { x:P[1].x, y:my });
+      const ah = up ? 6 : -6; seg({ x:mx, y:P[1].y }, { x:mx - 5, y:P[1].y + ah }); seg({ x:mx, y:P[1].y }, { x:mx + 5, y:P[1].y + ah });
+      const nb = Math.round(d.pts[1].l - d.pts[0].l), pct = dp / d.pts[0].p * 100;
+      const t1 = `${sign(dp)}${fmt(Math.abs(dp))} (${sign(dp)}${Math.abs(pct).toFixed(2)}%)`, t2 = `${Math.abs(nb)}봉 · ${fmtDur(Math.abs(nb) * TF[state.tf].s)}`;
+      const ly = up ? y - 26 : y + h + 26;
+      label(mx, ly - 9, t1, mc, C['on-color']); label(mx, ly + 9, t2, mc, C['on-color']); break;
+    }
+  }
+  if (selected) {
+    const { pw: w2, ph: h2 } = pane();
+    handlesOf(d, P, w2, h2).forEach(hp => { dc.beginPath(); dc.arc(hp.x, hp.y, 5, 0, Math.PI * 2); dc.fillStyle = C.panel; dc.fill(); dc.strokeStyle = c; dc.lineWidth = 1.5; dc.stroke(); });
+  }
+}
+function render() {
+  const dpr = devicePixelRatio || 1, W = wrap.clientWidth, H = wrap.clientHeight;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px'; }
+  dc.setTransform(dpr, 0, 0, dpr, 0, 0); dc.clearRect(0, 0, W, H);
+  if (mainSeries) {
+    const { pw, ph } = pane();
+    if (!state.hideDraw) {
+      dc.save(); dc.beginPath(); dc.rect(0, 0, pw, ph); dc.clip();
+      for (const d of list()) drawShape(d, d === sel, pw, ph);
+      if (draft) drawShape(draft, true, pw, ph);
+      dc.restore();
+      for (const d of list()) if (d.type === 'hline') { const y = mainSeries.priceToCoordinate(d.pts[0].p); if (y != null && y > 0 && y < ph) label(pw + 1, y, fmt(d.pts[0].p), col(d.color || 'accent'), C['on-color'], 'left'); }
+    }
+    // 현재 봉 마감까지 남은 시간 (가격 축의 현재가 라벨 아래)
+    if (lastMain.v != null) {
+      const y = mainSeries.priceToCoordinate(lastMain.v), bars = getBars(), last = bars[bars.length - 1];
+      if (y != null && y > 0 && y < ph - 20) label(pw + 1, y + 19, fmtDur(last.time + TF[state.tf].s - nowT()), lastMain.up ? C.up : C.down, C['on-color'], 'left');
+    }
+  }
+  requestAnimationFrame(render);
+}
+
+function local(e) { const r = wrap.getBoundingClientRect(); return { x:e.clientX - r.left, y:e.clientY - r.top }; }
+function swallowEv(e) { e.stopPropagation(); e.preventDefault(); swallow = true; }
+wrap.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || e.target.closest('.legend, .drawbar')) return;
+  const { x, y } = local(e), { pw, ph } = pane();
+  if (x > pw || y > ph) return;
+  if (ONE.has(state.tool) || TWO.has(state.tool)) {
+    const pt = fromXY(x, y, true); if (!pt) return;
+    swallowEv(e);
+    if (ONE.has(state.tool)) commit({ type:state.tool, pts:[pt] });
+    else if (!draft) { draft = { type:state.tool, pts:[pt, { ...pt }] }; hint('끝점을 클릭하세요'); }
+    else { draft.pts[1] = pt; const a = toXY(draft.pts[0]), b = toXY(pt);
+      if (a && b && Math.hypot(a.x - b.x, a.y - b.y) < 4) return; commit(draft); }
+    return;
+  }
+  if (state.hideDraw) return;
+  const hh = hit(x, y);
+  if (hh) {
+    swallowEv(e); select(hh.d);
+    drag = { d:hh.d, handle:hh.handle, sx:x, sy:y, orig:hh.d.pts.map(toXY), before:JSON.stringify(list()), moved:false };
+    try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
+  } else if (sel) select(null);
+}, true);
+['mousedown', 'touchstart'].forEach(t => wrap.addEventListener(t, e => { if (swallow) { e.stopPropagation(); if (t === 'touchstart' && e.cancelable) e.preventDefault(); } }, { capture:true, passive:false }));
+wrap.addEventListener('pointermove', e => {
+  const { x, y } = local(e);
+  if (drag) {
+    e.stopPropagation();
+    const dx = x - drag.sx, dy = y - drag.sy; if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
+    if (!drag.moved) return;
+    if (drag.handle >= 0) { const pt = fromXY(x, y, true); if (pt) drag.d.pts[drag.handle] = pt; }
+    else { const np = drag.orig.map(o => fromXY(o.x + dx, o.y + dy, false)); if (np.every(Boolean)) drag.d.pts = np; }
+    return;
+  }
+  if (draft) { const pt = fromXY(x, y, true); if (pt) draft.pts[1] = pt; }
+}, true);
+const endPointer = () => {
+  if (drag) { if (drag.moved) { pushHistory(drag.before); saveDrawings(); } drag = null; }
+  setTimeout(() => swallow = false, 0);
+};
+wrap.addEventListener('pointerup', endPointer, true);
+wrap.addEventListener('pointercancel', endPointer, true);
+
+function commit(d) {
+  pushHistory(); d.id = Date.now() + Math.random(); d.color = d.type === 'rect' ? 'i3' : d.type === 'fib' ? 'muted' : 'accent';
+  list().push(d); saveDrawings(); draft = null; setTool('cross'); select(d);
+}
+function select(d) {
+  sel = d; const bar = $('drawBar');
+  if (!d) { bar.hidden = true; return; }
+  const sw = d.type === 'measure' ? [] : ['accent', 'up', 'down', 'i0', 'i1', 'i3', 'muted'];
+  bar.innerHTML = sw.map(t => `<button class="swatch" data-sw="${t}" aria-label="색 변경" aria-pressed="${(d.color || 'accent') === t}" style="background:${col(t)}"></button>`).join('')
+    + (sw.length ? '<div class="vsep"></div>' : '')
+    + (d.type === 'hline' ? `<button class="tb" data-dact="alert" title="이 가격에 알림 만들기" aria-label="알림 만들기">${I.bell}</button>` : '')
+    + `<button class="tb" data-dact="del" title="삭제 (Delete)" aria-label="삭제">${I.trash}</button>`;
+  bar.hidden = false;
+}
+$('drawBar').addEventListener('click', e => {
+  const s = e.target.closest('[data-sw]'), a = e.target.closest('[data-dact]');
+  if (s && sel) { pushHistory(); sel.color = s.dataset.sw; saveDrawings(); select(sel); }
+  if (a && sel) {
+    if (a.dataset.dact === 'del') deleteSel();
+    else { addAlert(state.sym, 'cross', sel.pts[0].p); openPanel('alerts', true); }
+  }
+});
+function deleteSel() { if (!sel) return; pushHistory(); drawings[dKey()] = list().filter(d => d !== sel); saveDrawings(); select(null); }
+
+// 실행 취소 / 다시 실행 (현재 차트의 그림)
+const undoS = [], redoS = [];
+function pushHistory(json) { undoS.push(json ?? JSON.stringify(list())); if (undoS.length > 100) undoS.shift(); redoS.length = 0; paintUndo(); }
+function restore(json) { drawings[dKey()] = JSON.parse(json); saveDrawings(); select(null); }
+function undo() { if (!undoS.length) return; redoS.push(JSON.stringify(list())); restore(undoS.pop()); paintUndo(); }
+function redo() { if (!redoS.length) return; undoS.push(JSON.stringify(list())); restore(redoS.pop()); paintUndo(); }
+function paintUndo() { $('undoBtn').disabled = !undoS.length; $('redoBtn').disabled = !redoS.length; }
+
+let hintT;
+function hint(msg, ms) { clearTimeout(hintT); $('hint').textContent = msg || ''; $('hint').hidden = !msg; if (ms) hintT = setTimeout(() => $('hint').hidden = true, ms); }
+
+// ---------- 왼쪽 도구 막대 ----------
+const TOOLS = [
+  ['cross', '십자선', ''], ['arrow', '화살표', ''], null,
+  ['trend', '추세선', 'Alt+T'], ['ray', '반직선', ''], ['hline', '수평선', 'Alt+H'], ['vline', '수직선', 'Alt+V'], null,
+  ['rect', '사각형', 'Alt+R'], ['fib', '피보나치 되돌림', 'Alt+F'], ['measure', '가격 범위 측정', 'Alt+M'], null,
+];
+const HINTS = { trend:'시작점을 클릭하세요', ray:'시작점을 클릭하세요', rect:'첫 모서리를 클릭하세요', fib:'시작점을 클릭하세요', measure:'시작점을 클릭하세요', hline:'가격을 클릭하세요', vline:'시점을 클릭하세요' };
+TOOLS.forEach(t => {
+  if (!t) return $('tools').append(el('div', 'hsep'));
+  const b = el('button', 'tb', I[t[0]]); b.dataset.tool = t[0]; b.title = t[1] + (t[2] ? ` (${t[2]})` : ''); b.setAttribute('aria-label', t[1]);
+  b.addEventListener('click', () => setTool(state.tool === t[0] && t[0] !== 'cross' && t[0] !== 'arrow' ? 'cross' : t[0]));
+  $('tools').append(b);
+});
+[['magnet', '자석 모드: 시·고·저·종에 붙이기', I.magnet], ['hide', '모든 그림 숨기기', I.eyeOff], ['clear', '이 차트의 그림 모두 삭제', I.trash]].forEach(([k, t, ic]) => {
+  const b = el('button', 'tb', ic); b.dataset.tg = k; b.title = t; b.setAttribute('aria-label', t); $('tools').append(b);
+});
+$('tools').addEventListener('click', e => {
+  const b = e.target.closest('[data-tg]'); if (!b) return;
+  if (b.dataset.tg === 'magnet') { state.magnet = !state.magnet; hint(state.magnet ? '자석 모드 켬' : '자석 모드 끔', 1200); }
+  else if (b.dataset.tg === 'hide') { state.hideDraw = !state.hideDraw; select(null); }
+  else if (list().length) { pushHistory(); drawings[dKey()] = []; saveDrawings(); select(null); hint('그림을 모두 지웠습니다 · Ctrl+Z로 되돌리기', 2200); }
+  paintTools(); savePrefs();
+});
+function setTool(t) {
+  state.tool = t; draft = null;
+  if (t !== 'cross' && t !== 'arrow') select(null);
+  hint(HINTS[t] || '');
+  allCharts().forEach(c => c.applyOptions({ crosshair:chartOpts().crosshair }));
+  paintTools();
+}
+function paintTools() {
+  document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === state.tool));
+  document.querySelector('[data-tg="magnet"]').setAttribute('aria-pressed', state.magnet);
+  document.querySelector('[data-tg="hide"]').setAttribute('aria-pressed', state.hideDraw);
+}
+
+// ---------- 메뉴 ----------
+let openMenu = null;
+function showMenu(anchor, build) {
+  if (openMenu && openMenu.anchor === anchor) return closeMenu();
+  closeMenu();
+  const m = el('div', 'menu'); m.setAttribute('role', 'menu'); build(m); document.body.append(m);
+  const r = anchor.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(r.left, innerWidth - m.offsetWidth - 8)) + 'px';
+  m.style.top = (r.bottom + 4) + 'px';
+  openMenu = { m, anchor }; anchor.setAttribute('aria-expanded', 'true');
+  setTimeout(() => (m.querySelector('[aria-checked="true"]') || m.querySelector('button'))?.focus(), 0);
+}
+function closeMenu() { if (!openMenu) return; openMenu.m.remove(); openMenu.anchor.setAttribute('aria-expanded', 'false'); openMenu = null; }
+const mi = (html, checked, fn, sc = '') => { const b = el('button', 'mi', html + (sc ? `<span class="sc">${sc}</span>` : '')); b.setAttribute('role', 'menuitemradio'); b.setAttribute('aria-checked', !!checked); b.addEventListener('click', () => { closeMenu(); fn(); }); return b; };
+document.addEventListener('pointerdown', e => {
+  if (openMenu && !openMenu.m.contains(e.target) && !openMenu.anchor.contains(e.target)) closeMenu();
+  if (popEl && !popEl.contains(e.target) && !e.target.closest('[data-act="set"]')) closePop();
+}, true);
+$('tfBtn').addEventListener('click', e => showMenu(e.currentTarget, m => {
+  let g = '';
+  TFS.forEach(t => { if (t.g !== g) { g = t.g; m.append(el('div', 'mg', g)); } m.append(mi(t.l, t.k === state.tf, () => switchTo({ tf:t.k }), t.sh)); });
+}));
+$('typeBtn').addEventListener('click', e => showMenu(e.currentTarget, m => {
+  TYPES.forEach(([k, l]) => m.append(mi(I[k] + l, k === state.type, () => setType(k))));
+}));
+
+// ---------- 모달 ----------
+let modalOpen = null;
+function openModal(id) { closeMenu(); closePop(); modalOpen = $(id); modalOpen.hidden = false; }
+function closeModal() { if (!modalOpen) return; modalOpen.hidden = true; modalOpen = null; }
+document.querySelectorAll('.back').forEach(b => b.addEventListener('pointerdown', e => { if (e.target === b) closeModal(); }));
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeModal));
+
+let symCat = 'all', symActive = 0;
+$('symTabs').innerHTML = Object.entries(CAT).map(([k, l]) => `<button data-cat="${k}">${l}</button>`).join('');
+$('symTabs').addEventListener('click', e => { const b = e.target.closest('[data-cat]'); if (!b) return; symCat = b.dataset.cat; symActive = 0; renderSymList(); });
+function symMatches() {
+  const q = $('symQ').value.trim().toLowerCase();
+  return SYMBOLS.filter(s => (symCat === 'all' || s.t === symCat) && (!q || s.s.toLowerCase().includes(q) || s.n.toLowerCase().includes(q)));
+}
+function renderSymList() {
+  document.querySelectorAll('[data-cat]').forEach(b => b.setAttribute('aria-pressed', b.dataset.cat === symCat));
+  const arr = symMatches();
+  $('symList').innerHTML = arr.length ? arr.map((s, i) => `<button class="mrow${i === symActive ? ' active' : ''}" role="option" data-s="${s.s}">
+    <span class="badge" style="width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:var(--on-color);background:var(${BADGE[s.t]})">${s.s.slice(0, 2)}</span>
+    <b>${s.s}</b><span class="d">${s.n}</span><span class="x">${CAT[s.t]} · ${s.x}</span></button>`).join('')
+    : '<div class="empty">일치하는 종목이 없습니다. 코드(예: AAPL, 005930)나 이름으로 검색해 보세요.</div>';
+  $('symList').querySelector('.active')?.scrollIntoView({ block:'nearest' });
+}
+function openSymbolSearch(initial = '') {
+  openModal('symModal'); $('symQ').value = initial; symActive = 0; renderSymList(); $('symQ').focus();
+}
+$('symQ').addEventListener('input', () => { symActive = 0; renderSymList(); });
+$('symQ').addEventListener('keydown', e => {
+  const n = symMatches().length;
+  if (e.key === 'ArrowDown') { e.preventDefault(); symActive = Math.min(n - 1, symActive + 1); renderSymList(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); symActive = Math.max(0, symActive - 1); renderSymList(); }
+  else if (e.key === 'Enter') { const s = symMatches()[symActive]; if (s) { closeModal(); switchTo({ sym:s.s }); } }
+});
+$('symList').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (b) { closeModal(); switchTo({ sym:b.dataset.s }); } });
+$('symBtn').addEventListener('click', () => openSymbolSearch());
+
+function renderIndList() {
+  const q = $('indQ').value.trim().toLowerCase();
+  const arr = Object.entries(DEF).filter(([k, d]) => !q || d.name.toLowerCase().includes(q) || d.desc.toLowerCase().includes(q) || k.includes(q));
+  $('indList').innerHTML = arr.length ? arr.map(([k, d]) => { const n = state.inds.filter(c => c.type === k).length;
+    return `<button class="mrow ind" data-ind="${k}"><span><b>${d.name}</b><br><span class="d">${d.desc}${d.pane ? ' · 아래 창' : ' · 가격 차트 위'}</span></span><span class="cnt">${n ? `차트에 ${n}개` : ''}</span></button>`; }).join('')
+    : '<div class="empty">일치하는 지표가 없습니다.</div>';
+}
+$('indBtn').addEventListener('click', () => { openModal('indModal'); $('indQ').value = ''; renderIndList(); $('indQ').focus(); });
+$('indQ').addEventListener('input', renderIndList);
+$('indList').addEventListener('click', e => { const b = e.target.closest('[data-ind]'); if (!b) return; const c = addIndicator(b.dataset.ind); if (c) toast(`${indLabel(c)} 지표를 추가했습니다.`); renderIndList(); });
+
+// ---------- 차트 전환 ----------
+function paintHeader() {
+  const s = BY[state.sym];
+  $('symBtn').innerHTML = I.search + `<span>${s.s}</span>`;
+  $('tfBtn').innerHTML = TF[state.tf].sh + I.caret;
+  $('typeBtn').innerHTML = I[state.type] + I.caret;
+  $('indIco').innerHTML = I.fx; $('alertIco').innerHTML = I.bell;
+  $('undoBtn').innerHTML = I.undo; $('redoBtn').innerHTML = I.redo; $('fullBtn').innerHTML = I.full;
+  const dark = isDark(); $('themeBtn').innerHTML = dark ? I.sun : I.moon;
+  document.querySelectorAll('[data-strip]').forEach(b => b.innerHTML = b.dataset.strip === 'watch' ? I.list : I.bell);
+  document.querySelectorAll('[data-range]').forEach(b => b.setAttribute('aria-pressed', b.dataset.range === activeRange));
+}
+let activeRange = null;
+function switchTo(ch, keepRange) {
+  const changed = (ch.sym && ch.sym !== state.sym) || (ch.tf && ch.tf !== state.tf);
+  Object.assign(state, ch);
+  if (!keepRange) activeRange = null;
+  draft = null; select(null); setTool(state.tool === 'arrow' ? 'arrow' : 'cross');
+  if (changed) { undoS.length = 0; redoS.length = 0; paintUndo(); }
+  applyPrecision(); renderAll(true); buildLegends(); updateLegend();
+  paintHeader(); paintWatch(); updateDetail(); renderAlerts(); savePrefs();
+  if (!$('alPrice').matches(':focus')) $('alPrice').value = +price[state.sym].toFixed(prec());
+}
+function setType(t) {
+  state.type = t; main.removeSeries(mainSeries); makeMain(); applyPrecision(); renderAll(false); paintHeader(); savePrefs();
+}
+
+// ---------- 하단 막대 ----------
+const RANGES = [['1D', '5', 288], ['5D', '15', 480], ['1M', '60', 720], ['3M', '240', 540], ['6M', 'D', 182], ['YTD', 'D', 'ytd'], ['1Y', 'D', 365], ['5Y', 'W', 260], ['전체', 'W', 'all']];
+RANGES.forEach(([l, tf, n]) => {
+  const b = el('button', 'tb', l); b.dataset.range = l; b.title = `${l} 기간 보기`;
+  b.addEventListener('click', () => {
+    activeRange = l; switchTo({ tf }, true);
+    const N = getBars().length;
+    if (n === 'all') main.timeScale().fitContent();
+    else {
+      const cnt = n === 'ytd' ? Math.max(5, Math.round((Date.now() - new Date(new Date().getFullYear(), 0, 1)) / 864e5)) : n;
+      main.timeScale().setVisibleLogicalRange({ from:N - cnt, to:N + 4 });
+    }
+    paintHeader();
+  });
+  $('ranges').append(b);
+});
+$('pctBtn').addEventListener('click', () => { state.scale = state.scale === 'pct' ? 'normal' : 'pct'; applyScale(); savePrefs(); });
+$('logBtn').addEventListener('click', () => { state.scale = state.scale === 'log' ? 'normal' : 'log'; applyScale(); savePrefs(); });
+$('autoBtn').addEventListener('click', () => { allCharts().forEach(c => c.priceScale('right').applyOptions({ autoScale:true })); hint('가격 축을 자동으로 맞췄습니다', 1200); });
+
+// ---------- 오른쪽 패널 ----------
+function openPanel(p, forceOpen) {
+  if (!forceOpen && state.sideOpen && state.panel === p && !isMobile()) state.sideOpen = false;
+  else { state.sideOpen = true; state.panel = p; }
+  applySide(); savePrefs();
+}
+function applySide() {
+  $('app').classList.toggle('side-closed', !state.sideOpen);
+  $('pWatch').hidden = state.panel !== 'watch'; $('pAlerts').hidden = state.panel !== 'alerts';
+  $('tabWatch').setAttribute('aria-selected', state.panel === 'watch'); $('tabAlerts').setAttribute('aria-selected', state.panel === 'alerts');
+  document.querySelectorAll('[data-strip]').forEach(b => b.setAttribute('aria-pressed', state.sideOpen && b.dataset.strip === state.panel));
+}
+document.querySelectorAll('[data-strip]').forEach(b => b.addEventListener('click', () => openPanel(b.dataset.strip)));
+document.querySelectorAll('.ptabs [data-panel]').forEach(b => b.addEventListener('click', () => openPanel(b.dataset.panel, true)));
+$('alertTopBtn').addEventListener('click', () => { openPanel('alerts', true); $('alPrice').value = +price[state.sym].toFixed(prec()); $('alPrice').focus(); });
+
+SYMBOLS.forEach(s => {
+  const r = el('button', 'wrow'); r.dataset.sym = s.s; r.title = s.n;
+  r.innerHTML = `<span class="s"><span class="badge" style="background:var(${BADGE[s.t]})">${s.s.slice(0, 1)}</span><span>${s.s}</span></span><span class="num p"></span><span class="num c"></span><span class="num cp"></span>`;
+  r.addEventListener('click', () => switchTo({ sym:s.s }));
+  $('wlist').append(r);
+});
+const shown = {};
+function paintWatch() { document.querySelectorAll('.wrow').forEach(r => r.setAttribute('aria-current', r.dataset.sym === state.sym)); }
+function updateWatch() {
+  document.querySelectorAll('.wrow').forEach(r => {
+    const k = r.dataset.sym, s = BY[k], p = price[k], ch = p - prevClose[k], cls = ch >= 0 ? 'up' : 'down';
+    const pe = r.querySelector('.p'); pe.textContent = fmt(p, s.d);
+    if (shown[k] != null && p !== shown[k]) { pe.classList.remove('fu', 'fd'); void pe.offsetWidth; pe.classList.add(p > shown[k] ? 'fu' : 'fd'); setTimeout(() => pe.classList.remove('fu', 'fd'), 200); }
+    shown[k] = p;
+    const c = r.querySelector('.c'), cp = r.querySelector('.cp');
+    c.textContent = sign(ch) + fmt(Math.abs(ch), s.d); c.className = 'num c ' + cls;
+    cp.textContent = sign(ch) + Math.abs(ch / prevClose[k] * 100).toFixed(2) + '%'; cp.className = 'num cp ' + cls;
   });
 }
-function updateQuote() {
+function updateDetail() {
   const s = BY[state.sym], p = price[s.s], pc = prevClose[s.s], ch = p - pc, cls = ch >= 0 ? 'up' : 'down';
-  $('qLast').textContent = fmt(p, s.d); $('qLast').className = 'last num ' + cls;
-  $('qChg').textContent = `${ch >= 0 ? '+' : ''}${fmt(ch, s.d)} (${ch >= 0 ? '+' : ''}${(ch / pc * 100).toFixed(2)}%)`;
-  $('qChg').className = 'chg num ' + cls;
-  const d = cache[s.s + '|1D']; catchUp(s.s, '1D', d);
-  const today = d[d.length - 1], yr = d.slice(-252);
-  const hi52 = Math.max(...yr.map(b => b.high)), lo52 = Math.min(...yr.map(b => b.low));
-  $('detail').innerHTML = `
-    <dt>${s.n}</dt><dd></dd>
-    <dt>전일 종가</dt><dd class="num">${fmt(pc, s.d)}</dd>
-    <dt>오늘 시가</dt><dd class="num">${fmt(today.open, s.d)}</dd>
-    <dt>오늘 범위</dt><dd class="num">${fmt(today.low, s.d)} – ${fmt(today.high, s.d)}</dd>
-    <dt>52주 범위</dt><dd class="num">${fmt(lo52, s.d)} – ${fmt(hi52, s.d)}</dd>
-    ${s.vb ? `<dt>오늘 거래량</dt><dd class="num">${fmtVol(today.volume)}</dd>` : ''}`;
-  document.title = `${s.s} ${fmt(p, s.d)} · Candle Desk`;
+  const d = cache[s.s + '|D']; catchUp(s.s, 'D', d);
+  const today = d[d.length - 1], yr = d.slice(-252), hi = Math.max(...yr.map(b => b.high)), lo = Math.min(...yr.map(b => b.low));
+  $('dSym').textContent = s.s; $('dEx').textContent = s.x; $('dName').textContent = s.n;
+  $('dLast').textContent = fmt(p, s.d); $('dLast').className = 'big num ' + cls;
+  $('dChg').innerHTML = `<span class="${cls}">${sign(ch)}${fmt(Math.abs(ch), s.d)} (${sign(ch)}${Math.abs(ch / pc * 100).toFixed(2)}%)</span>`;
+  const pos = (v, a, b) => (b > a ? Math.max(0, Math.min(1, (v - a) / (b - a))) : .5) * 100 + '%';
+  $('dDayDot').style.left = pos(p, today.low, today.high); $('dDayLo').textContent = fmt(today.low, s.d); $('dDayHi').textContent = fmt(today.high, s.d);
+  $('dYrDot').style.left = pos(p, lo, hi); $('dYrLo').textContent = fmt(lo, s.d); $('dYrHi').textContent = fmt(hi, s.d);
+  $('dStats').innerHTML = `<dt>전일 종가</dt><dd class="num">${fmt(pc, s.d)}</dd><dt>시가</dt><dd class="num">${fmt(today.open, s.d)}</dd>`
+    + (s.vb ? `<dt>거래량</dt><dd class="num">${fmtVol(today.volume)}</dd>` : '') + `<dt>분류</dt><dd>${CAT[s.t]}</dd>`;
+  const up = ch >= 0;
+  document.title = `${s.s} ${fmt(p, s.d)} ${up ? '▲' : '▼'} ${sign(ch)}${Math.abs(ch / pc * 100).toFixed(2)}% · Candle Desk`;
 }
 
-// ---------- 실시간 틱(시뮬레이션) ----------
-function tick() {
-  SYMBOLS.forEach(s => { price[s.s] *= Math.exp(gauss(Math.random) * s.v * 0.0045); });
-  const bars = getBars(), last = bars[bars.length - 1];
-  const avg = bars.slice(-30).reduce((a, b) => a + b.volume, 0) / 30;
-  last.volume += avg * 0.03 * Math.random();
-  updateLast(); updateList(); updateQuote();
-  if (hoverTime == null) showLegend();
-  $('clock').textContent = new Date().toLocaleTimeString('ko-KR', { hour12:false });
+// ---------- 알림 ----------
+if (!Array.isArray(state.alerts)) state.alerts = [{ id:1, sym:'BTCUSD', cond:'cross', price:Math.round(price.BTCUSD * 1.0015), created:Date.now(), example:true }];
+let alertLines = [];
+const CONDL = { cross:'교차', up:'위로 교차', down:'아래로 교차' };
+function addAlert(sym, cond, p) {
+  state.alerts.unshift({ id:Date.now(), sym, cond, price:+(+p).toFixed(BY[sym].d), created:Date.now() });
+  savePrefs(); renderAlerts(); refreshAlertLines(); toast(`${sym} ${fmt(+p, BY[sym].d)} ${CONDL[cond]} 알림을 만들었습니다.`);
+}
+function refreshAlertLines() {
+  alertLines.forEach(l => { try { mainSeries.removePriceLine(l); } catch (e) {} }); alertLines = [];
+  state.alerts.filter(a => a.sym === state.sym && !a.fired).forEach(a => alertLines.push(mainSeries.createPriceLine({ price:a.price, color:C.warn, lineWidth:1, lineStyle:LW.LineStyle.Dashed, axisLabelVisible:true, title:'알림' })));
+}
+function renderAlerts() {
+  $('alSym').value = `${state.sym} · ${BY[state.sym].n}`;
+  const L = $('alList');
+  if (!state.alerts.length) { L.innerHTML = '<div class="empty">알림이 없습니다. 위에서 가격을 정하거나, 차트에 수평선을 그린 뒤 종 모양 버튼을 눌러 만들 수 있습니다.</div>'; return; }
+  L.innerHTML = state.alerts.map(a => `<div class="alrow"><span class="t">${a.sym} <span class="num">${fmt(a.price, BY[a.sym].d)}</span></span>
+    <button class="tb" data-aldel="${a.id}" aria-label="알림 삭제" title="삭제">${I.trash}</button>
+    <span class="m">${CONDL[a.cond]}${a.example ? ' · 예시' : ''} · <span class="st${a.fired ? ' fired' : ''}">${a.fired ? '발동됨 ' + new Date(a.fired).toLocaleTimeString('ko-KR', { hour12:false }) : '대기 중'}</span></span></div>`).join('');
+}
+$('alList').addEventListener('click', e => { const b = e.target.closest('[data-aldel]'); if (!b) return; state.alerts = state.alerts.filter(a => a.id !== +b.dataset.aldel); savePrefs(); renderAlerts(); refreshAlertLines(); });
+$('alForm').addEventListener('submit', e => { e.preventDefault(); const v = parseFloat($('alPrice').value); if (!(v > 0)) return; addAlert(state.sym, $('alCond').value, v); });
+function checkAlerts(prev) {
+  let any = false;
+  for (const a of state.alerts) {
+    if (a.fired) continue;
+    const p0 = prev[a.sym], p1 = price[a.sym];
+    const up = p0 < a.price && p1 >= a.price, dn = p0 > a.price && p1 <= a.price;
+    if ((a.cond === 'up' && up) || (a.cond === 'down' && dn) || (a.cond === 'cross' && (up || dn))) {
+      a.fired = Date.now(); any = true;
+      toast(`<b>${a.sym} 알림 발동</b>${fmt(a.price, BY[a.sym].d)} ${CONDL[a.cond]} · 현재가 ${fmt(p1, BY[a.sym].d)}`, 8000);
+    }
+  }
+  if (any) { savePrefs(); renderAlerts(); refreshAlertLines(); }
+}
+function toast(html, ms = 3500) {
+  const t = el('div', 'toast', `<span class="ic">${I.bell}</span><div>${html}</div>`);
+  $('toasts').append(t); setTimeout(() => t.remove(), ms);
 }
 
-// ---------- 테마 변경 대응 ----------
+// ---------- 테마·전체 화면 ----------
+function isDark() { const a = document.documentElement.dataset.theme; return a ? a === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; }
+$('themeBtn').addEventListener('click', () => { state.theme = isDark() ? 'light' : 'dark'; document.documentElement.dataset.theme = state.theme; savePrefs(); });
+$('fullBtn').addEventListener('click', () => {
+  try { if (document.fullscreenElement) document.exitFullscreen(); else { const p = $('app').requestFullscreen?.(); p?.catch?.(() => toast('이 화면에서는 전체 화면을 쓸 수 없습니다.')); } } catch (e) {}
+});
 function applyTheme() {
   C = tok();
-  main.applyOptions(chartOpts(C)); rsiC.applyOptions(chartOpts(C));
-  ind.ma20.applyOptions({ color:C.ma20 }); ind.ma50.applyOptions({ color:C.ma50 }); ind.ema200.applyOptions({ color:C.ema });
-  ['bbU', 'bbM', 'bbL'].forEach(k => ind[k].applyOptions({ color:C.bb }));
-  rsiS.applyOptions({ color:C.ma50 }); rsiLines.forEach(l => l.applyOptions({ color:C.muted }));
-  clearDrawObjs(); main.removeSeries(mainSeries); makeMain(); applyPrecision(); renderAll(false); drawAll(); paintControls();
+  main.removeSeries(mainSeries);
+  for (const r of [...rt.values()]) removeRuntime(r);
+  main.applyOptions(chartOpts()); makeMain();
+  state.inds.forEach(addRuntime);
+  applyPrecision(); applyScale(); applyMainMargins(); updateTimeAxes(); buildLegends(); renderAll(false); paintHeader(); select(sel);
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
 
+// ---------- 키보드 ----------
+addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase(), typing = ['input', 'textarea', 'select'].includes(tag);
+  if (e.key === 'Escape') {
+    if (openMenu) return closeMenu(); if (popEl) return closePop(); if (modalOpen) return closeModal();
+    if (draft || (state.tool !== 'cross' && state.tool !== 'arrow')) return setTool('cross');
+    if (sel) select(null); return;
+  }
+  if (typing || modalOpen) return;
+  if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+    const k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+    return;
+  }
+  if (e.altKey) {
+    const map = { KeyT:'trend', KeyH:'hline', KeyV:'vline', KeyF:'fib', KeyR:'rect', KeyM:'measure' };
+    if (map[e.code]) { e.preventDefault(); setTool(map[e.code]); } return;
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); deleteSel(); return; }
+  if (/^[a-z0-9]$/i.test(e.key)) { e.preventDefault(); openSymbolSearch(e.key.toUpperCase()); }
+});
+$('undoBtn').addEventListener('click', undo); $('redoBtn').addEventListener('click', redo);
+
+// ---------- 실시간 틱 (시뮬레이션) ----------
+function tick() {
+  const prev = { ...price };
+  SYMBOLS.forEach(s => price[s.s] *= Math.exp(gauss(Math.random) * s.v * 0.0045));
+  const bars = getBars(), last = bars[bars.length - 1];
+  if (BY[state.sym].vb) { const avg = bars.slice(-30).reduce((a, b) => a + b.volume, 0) / 30; last.volume += avg * 0.03 * Math.random(); }
+  updateLast(); updateWatch(); updateDetail(); checkAlerts(prev);
+  if (hoverIdx == null) updateLegend();
+  $('clock').textContent = `${new Date().toLocaleTimeString('en-GB', { hour12:false })} (${tzLabel})`;
+}
+
 // ---------- 시작 ----------
-makeMain(); applyPrecision(); applyVisibility(); renderAll(true); drawAll(); paintControls(); updateList(); updateQuote(); setTool('cursor');
+makeMain();
+state.inds.forEach(addRuntime);
+applyPrecision(); applyScale(); applyMainMargins(); updateTimeAxes();
+renderAll(true); buildLegends(); updateLegend();
+applySide(); paintHeader(); paintTools(); paintUndo(); paintWatch(); updateWatch(); updateDetail(); renderAlerts();
+$('alPrice').value = +price[state.sym].toFixed(prec());
 tick(); setInterval(tick, 1000);
+requestAnimationFrame(render);
 })();
 </script>
 
