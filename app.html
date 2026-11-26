@@ -124,7 +124,12 @@ button, select, input { font:inherit; color:inherit; }
 .wl-head { font-size:11px; color:var(--muted); padding-block:6px; border-bottom:1px solid var(--line); flex:none; }
 .wl-head span:not(:first-child), .wrow .num { text-align:right; }
 .wlist { overflow-y:auto; flex:1 1 auto; min-height:80px; }
-.wrow { padding-block:6px; cursor:pointer; border:0; width:100%; background:transparent; text-align:left; font-size:12.5px; }
+.wrow { padding-block:6px; cursor:pointer; font-size:12.5px; }
+.wrow .wx { width:18px; height:18px; padding:0; border:0; border-radius:3px; background:transparent; color:var(--muted); cursor:pointer; display:none; place-items:center; flex:none; }
+.wrow .wx svg { width:12px; height:12px; }
+.wrow:hover .wx, .wrow:focus-within .wx { display:grid; }
+@media (hover:none) { .wrow .wx { display:grid; } }
+.wrow .wx:hover { background:var(--panel); color:var(--down); }
 .wrow:hover { background:var(--hover); }
 .wrow[aria-current="true"] { background:var(--active); }
 .wrow .s { font-weight:600; display:flex; align-items:center; gap:6px; min-width:0; }
@@ -425,6 +430,9 @@ const SYMBOLS = [
   { s:'BTCUSDT', n:'비트코인 / 테더',       t:'crypto', x:'BINANCE', p:67250, v:.028, d:2, vb:1800, src:'binance' },
   { s:'ETHUSDT', n:'이더리움 / 테더',       t:'crypto', x:'BINANCE', p:3420,  v:.032, d:2, vb:22000, src:'binance' },
   { s:'SOLUSDT', n:'솔라나 / 테더',         t:'crypto', x:'BINANCE', p:182.4, v:.045, d:2, vb:3.1e6, src:'binance' },
+  { s:'BNBUSDT', n:'BNB / 테더',            t:'crypto', x:'BINANCE', p:640,   v:.030, d:2, vb:4.0e5, src:'binance' },
+  { s:'XRPUSDT', n:'리플 / 테더',           t:'crypto', x:'BINANCE', p:0.62,  v:.040, d:4, vb:2.0e8, src:'binance' },
+  { s:'DOGEUSDT', n:'도지코인 / 테더',      t:'crypto', x:'BINANCE', p:0.16,  v:.050, d:5, vb:1.0e9, src:'binance' },
   { s:'IXIC',   n:'나스닥 종합지수',         t:'index',  x:'NASDAQ', p:19060,  v:.011, d:2, vb:0, src:'twelve' },
   { s:'NDX',    n:'나스닥 100 지수',         t:'index',  x:'NASDAQ', p:20150,  v:.011, d:2, vb:0, src:'twelve' },
   { s:'AAPL',   n:'Apple Inc.',             t:'stock',  x:'NASDAQ', p:228.4,  v:.014, d:2, vb:5.2e7 },
@@ -495,10 +503,25 @@ state.alerts = (state.alerts || []).filter(a => BY[a.sym]);
 if (!TF[state.tf]) state.tf = '60';
 if (!TYPES.some(t => t[0] === state.type)) state.type = 'candles';
 state.inds = (state.inds || []).filter(c => DEF[c.type]);
+
+// 사용자가 검색해서 추가한 바이낸스 코인
+const KO = { BTC:'비트코인', ETH:'이더리움', SOL:'솔라나', XRP:'리플', DOGE:'도지코인', ADA:'에이다', TRX:'트론', AVAX:'아발란체', LINK:'체인링크',
+  DOT:'폴카닷', SUI:'수이', TON:'톤코인', SHIB:'시바이누', LTC:'라이트코인', BCH:'비트코인캐시', PEPE:'페페', NEAR:'니어', APT:'앱토스', ETC:'이더리움클래식',
+  UNI:'유니스왑', ATOM:'코스모스', XLM:'스텔라루멘', FIL:'파일코인', ARB:'아비트럼', OP:'옵티미즘', HBAR:'헤데라', ICP:'인터넷컴퓨터', AAVE:'에이브',
+  WLD:'월드코인', SEI:'세이', INJ:'인젝티브', TIA:'셀레스티아', JUP:'주피터', BONK:'봉크', WIF:'도그위프햇', ENA:'에테나', TAO:'비텐서', RENDER:'렌더', FET:'페치' };
+const precFor = p => p >= 10 ? 2 : p >= 1 ? 4 : p >= 0.01 ? 5 : 8;
+const coinName = base => (KO[base] || base) + ' / 테더';
+function makeCoin(sym, p) {
+  const base = sym.replace(/USDT$/, '');
+  return { s:sym, n:coinName(base), t:'crypto', x:'BINANCE', p:p || 1, v:.05, d:precFor(p || 1), vb:1e6, src:'binance', user:true };
+}
+state.coins = (Array.isArray(state.coins) ? state.coins : []).filter(c => c && /^[A-Z0-9]{2,20}USDT$/.test(c.s) && !BY[c.s]);
+state.coins.forEach(c => { const o = makeCoin(c.s, c.p); SYMBOLS.push(o); BY[o.s] = o; });
 const drawings = store.get('drawings', {});
 function savePrefs() {
   const { sym, tf, type, scale, panel, sideOpen, magnet, hideDraw, theme, inds, nextId, alerts, legendCollapsed } = state;
-  store.set('prefs', { sym, tf, type, scale, panel, sideOpen, magnet, hideDraw, theme, inds, nextId, alerts, legendCollapsed });
+  const coins = (state.coins || []).map(c => ({ s:c.s, p:price[c.s] || c.p }));
+  store.set('prefs', { sym, tf, type, scale, panel, sideOpen, magnet, hideDraw, theme, inds, nextId, alerts, legendCollapsed, coins });
 }
 if (state.theme) document.documentElement.dataset.theme = state.theme;
 
@@ -674,16 +697,34 @@ setInterval(() => pollTwelve(false), 30000);
 
 async function initBinance() {
   const bs = SYMBOLS.filter(s => s.src === 'binance');
-  try {
-    await Promise.all(bs.map(async s => {
-      const d = await loadHistory(s.s, 'D');
-      prevClose[s.s] = d[d.length - 2].close; price[s.s] = d[d.length - 1].close; feed[s.s] = 'live';
-    }));
-    binStatus = '연결됨'; openBinanceWS();
-  } catch (e) {
-    bs.forEach(s => feed[s.s] = 'sim');
+  // 첫 종목으로 접속 가능한 주소를 정한 뒤 나머지를 동시에 불러온다
+  const one = async s => {
+    const d = await loadHistory(s.s, 'D');
+    prevClose[s.s] = d[d.length - 2].close; price[s.s] = d[d.length - 1].close; feed[s.s] = 'live';
+    if (s.user) s.d = precFor(price[s.s]);
+  };
+  const first = await Promise.allSettled([one(bs[0])]);
+  const res = first.concat(await Promise.allSettled(bs.slice(1).map(one)));
+  const fails = res.map((r, i) => [r, bs[i]]).filter(([r]) => r.status === 'rejected');
+  fails.forEach(([, s]) => feed[s.s] = 'sim');
+  if (fails.length === bs.length) {
+    const e = fails[0][0].reason;
     if (e.network || e.name === 'AbortError') { blocked = true; binStatus = '연결 불가'; } else binStatus = '오류: ' + e.message;
+    return;
   }
+  binStatus = '연결됨'; openBinanceWS(); loadCoinList();
+}
+// 검색용 바이낸스 USDT 거래쌍 목록 (24시간 거래대금 순)
+let coinList = [];
+async function loadCoinList() {
+  try {
+    const a = await binance('/api/v3/ticker/24hr?type=MINI');
+    const STABLE = /^(USDC|FDUSD|TUSD|BUSD|USDP|DAI|EUR|AEUR|USDE|XUSD|RLUSD|USD1|PAXG)USDT$/;
+    coinList = a.filter(t => /^[A-Z0-9]{2,20}USDT$/.test(t.symbol) && !STABLE.test(t.symbol) && +t.quoteVolume > 0 && +t.lastPrice > 0)
+      .sort((x, y) => y.quoteVolume - x.quoteVolume).slice(0, 300)
+      .map(t => ({ s:t.symbol, base:t.symbol.slice(0, -4), p:+t.lastPrice, qv:+t.quoteVolume, chg:(+t.lastPrice / +t.openPrice - 1) * 100 }));
+    if (modalOpen === $('symModal')) renderSymList();
+  } catch (e) {}
 }
 async function initTwelve() {
   const ts = SYMBOLS.filter(s => s.src === 'twelve');
@@ -1360,14 +1401,21 @@ $('symTabs').innerHTML = Object.entries(CAT).map(([k, l]) => `<button data-cat="
 $('symTabs').addEventListener('click', e => { const b = e.target.closest('[data-cat]'); if (!b) return; symCat = b.dataset.cat; symActive = 0; renderSymList(); });
 function symMatches() {
   const q = $('symQ').value.trim().toLowerCase();
-  return SYMBOLS.filter(s => (symCat === 'all' || s.t === symCat) && (!q || s.s.toLowerCase().includes(q) || s.n.toLowerCase().includes(q)));
+  const own = SYMBOLS.filter(s => (symCat === 'all' || s.t === symCat) && (!q || s.s.toLowerCase().includes(q) || s.n.toLowerCase().includes(q)));
+  if (!(symCat === 'crypto' || (symCat === 'all' && q))) return own;
+  const extra = coinList.filter(c => !BY[c.s] && (!q || c.s.toLowerCase().includes(q) || coinName(c.base).toLowerCase().includes(q)))
+    .slice(0, q ? 40 : 60).map(c => ({ s:c.s, n:coinName(c.base), t:'crypto', x:'BINANCE', virtual:true, p:c.p, qv:c.qv, chg:c.chg }));
+  return own.concat(extra);
 }
+const fmtUsd = v => v >= 1e9 ? '$' + (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : '$' + Math.round(v / 1e3) + 'K';
+function pickSymbol(s) { closeModal(); if (s.virtual) addCoin(s.s, s.p); else switchTo({ sym:s.s }); }
 function renderSymList() {
   document.querySelectorAll('[data-cat]').forEach(b => b.setAttribute('aria-pressed', b.dataset.cat === symCat));
   const arr = symMatches();
-  $('symList').innerHTML = arr.length ? arr.map((s, i) => `<button class="mrow${i === symActive ? ' active' : ''}" role="option" data-s="${s.s}">
+  $('symList').innerHTML = arr.length ? arr.map((s, i) => `<button class="mrow${i === symActive ? ' active' : ''}" role="option" data-i="${i}">
     <span class="badge" style="width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:var(--on-color);background:var(${BADGE[s.t]})">${s.s.slice(0, 2)}</span>
-    <b>${s.s}</b><span class="d">${s.n}</span><span class="x">${CAT[s.t]} · ${s.x}</span></button>`).join('')
+    <b>${esc(s.s)}</b><span class="d">${esc(s.n)}</span><span class="x">${s.virtual ? `<span class="${s.chg >= 0 ? 'up' : 'down'}">${sign(s.chg)}${Math.abs(s.chg).toFixed(2)}%</span> · 거래대금 ${fmtUsd(s.qv)} · <b style="color:var(--accent)">+ 추가</b>` : `${CAT[s.t]} · ${s.x}`}</span></button>`).join('')
+    + (symCat === 'crypto' && !coinList.length ? '<div class="empty">바이낸스 코인 목록은 실시간 연결이 될 때만 검색할 수 있습니다.</div>' : '')
     : '<div class="empty">일치하는 종목이 없습니다. 코드(예: AAPL, 005930)나 이름으로 검색해 보세요.</div>';
   $('symList').querySelector('.active')?.scrollIntoView({ block:'nearest' });
 }
@@ -1379,9 +1427,9 @@ $('symQ').addEventListener('keydown', e => {
   const n = symMatches().length;
   if (e.key === 'ArrowDown') { e.preventDefault(); symActive = Math.min(n - 1, symActive + 1); renderSymList(); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); symActive = Math.max(0, symActive - 1); renderSymList(); }
-  else if (e.key === 'Enter') { const s = symMatches()[symActive]; if (s) { closeModal(); switchTo({ sym:s.s }); } }
+  else if (e.key === 'Enter') { const s = symMatches()[symActive]; if (s) pickSymbol(s); }
 });
-$('symList').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (b) { closeModal(); switchTo({ sym:b.dataset.s }); } });
+$('symList').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) { const s = symMatches()[+b.dataset.i]; if (s) pickSymbol(s); } });
 $('symBtn').addEventListener('click', () => openSymbolSearch());
 
 function renderIndList() {
@@ -1469,12 +1517,40 @@ document.querySelectorAll('[data-strip]').forEach(b => b.addEventListener('click
 document.querySelectorAll('.ptabs [data-panel]').forEach(b => b.addEventListener('click', () => openPanel(b.dataset.panel, true)));
 $('alertTopBtn').addEventListener('click', () => { openPanel('alerts', true); $('alPrice').value = +price[state.sym].toFixed(prec()); $('alPrice').focus(); });
 
-SYMBOLS.forEach(s => {
-  const r = el('button', 'wrow'); r.dataset.sym = s.s; r.title = s.n;
-  r.innerHTML = `<span class="s"><span class="badge" style="background:var(${BADGE[s.t]})">${s.s.slice(0, 1)}</span><span>${s.s}</span><i class="ld" title="실시간" hidden></i></span><span class="num p"></span><span class="num c"></span><span class="num cp"></span>`;
-  r.addEventListener('click', () => switchTo({ sym:s.s }));
-  $('wlist').append(r);
-});
+function addWatchRow(s) {
+  const r = el('div', 'wrow'); r.dataset.sym = s.s; r.title = s.n; r.tabIndex = 0; r.setAttribute('role', 'button');
+  r.innerHTML = `<span class="s"><span class="badge" style="background:var(${BADGE[s.t]})">${esc(s.s.slice(0, 1))}</span><span>${esc(s.s)}</span><i class="ld" title="실시간" hidden></i>${s.user ? `<button class="wx" data-rm aria-label="${esc(s.s)} 관심종목에서 빼기" title="관심종목에서 빼기">${I.close}</button>` : ''}</span><span class="num p"></span><span class="num c"></span><span class="num cp"></span>`;
+  r.addEventListener('click', e => { if (e.target.closest('[data-rm]')) { e.stopPropagation(); removeCoin(s.s); return; } switchTo({ sym:s.s }); });
+  r.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === r) { e.preventDefault(); switchTo({ sym:s.s }); } });
+  const rows = [...$('wlist').children], after = s.user ? rows.filter(x => BY[x.dataset.sym]?.t === 'crypto').pop() : null;
+  if (after) after.after(r); else $('wlist').append(r);
+  return r;
+}
+SYMBOLS.forEach(addWatchRow);
+// 검색에서 고른 바이낸스 코인을 관심종목에 추가
+async function addCoin(sym, p) {
+  if (BY[sym]) return switchTo({ sym });
+  const o = makeCoin(sym, p); SYMBOLS.push(o); BY[sym] = o; feed[sym] = 'loading'; price[sym] = o.p; prevClose[sym] = o.p;
+  cache[sym + '|D'] = generate(o, 'D');
+  state.coins.push({ s:sym, p:o.p }); addWatchRow(o); updateWatch(); savePrefs();
+  loading = true; showLoading(`${sym} 바이낸스 시세를 불러오는 중`);
+  try {
+    const d = await loadHistory(sym, 'D');
+    prevClose[sym] = d[d.length - 2].close; price[sym] = d[d.length - 1].close; o.d = precFor(price[sym]); feed[sym] = 'live';
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ method:'SUBSCRIBE', params:[sym.toLowerCase() + '@miniTicker'], id:Date.now() }));
+  } catch (e) { feed[sym] = 'sim'; toast(`<b>${esc(sym)} 시세를 불러오지 못했습니다</b>${esc(e.message)}`); }
+  finally { loading = false; showLoading(''); }
+  await switchTo({ sym }); toast(`${esc(o.n)}을(를) 관심종목에 추가했습니다.`);
+}
+async function removeCoin(sym) {
+  const o = BY[sym]; if (!o || !o.user) return;
+  if (state.sym === sym) await switchTo({ sym:'BTCUSDT' });
+  SYMBOLS.splice(SYMBOLS.indexOf(o), 1); delete BY[sym];
+  state.coins = state.coins.filter(c => c.s !== sym); state.alerts = state.alerts.filter(a => a.sym !== sym);
+  document.querySelector(`.wrow[data-sym="${sym}"]`)?.remove();
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ method:'UNSUBSCRIBE', params:[sym.toLowerCase() + '@miniTicker'], id:Date.now() }));
+  savePrefs(); renderAlerts(); refreshAlertLines();
+}
 const shown = {};
 function paintWatch() { document.querySelectorAll('.wrow').forEach(r => r.setAttribute('aria-current', r.dataset.sym === state.sym)); }
 function updateWatch() {
