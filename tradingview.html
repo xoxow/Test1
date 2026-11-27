@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Market View</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 상단 바(종목 그룹·테마) / 시세 흐름 막대 / 종목 요약 / 트레이딩뷰 고급 차트(오른쪽 관심종목 포함) */
+:root {
+  --bg:#eef0f4; --panel:#ffffff; --line:#dfe2e9; --fg:#151922; --muted:#687087; --hover:#f0f2f7; --accent:#2f6bff; --active:#e4ebff;
+  --sans:"Inter", system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
+:root[data-theme="dark"] {
+  --bg:#06080c; --panel:#11141b; --line:#232836; --fg:#e3e7ef; --muted:#878fa3; --hover:#1a1f2a; --accent:#5b8cff; --active:#1a2747; color-scheme:dark;
+}
+* { box-sizing:border-box; }
+[hidden] { display:none !important; }
+html, body { height:100%; }
+body {
+  margin:0; background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:13px;
+  display:flex; flex-direction:column; gap:6px;
+  padding:max(8px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+}
+button { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:6px; }
+
+.top { display:flex; align-items:center; gap:10px; padding:6px 10px; flex:none; overflow-x:auto; scrollbar-width:none; }
+.top::-webkit-scrollbar { display:none; }
+.brand { font-weight:700; font-size:14px; white-space:nowrap; display:flex; align-items:center; gap:8px; padding-right:10px; border-right:1px solid var(--line); }
+.tabs { display:flex; gap:2px; flex:none; }
+.tabs button, .chips button, .iconbtn {
+  border:0; background:transparent; border-radius:4px; padding:6px 10px; cursor:pointer; white-space:nowrap; color:var(--muted); font-weight:500;
+}
+.tabs button:hover, .chips button:hover, .iconbtn:hover { background:var(--hover); color:var(--fg); }
+.tabs button[aria-selected="true"] { color:var(--fg); background:var(--hover); font-weight:600; }
+.chips { display:flex; gap:2px; flex:1 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none; border-left:1px solid var(--line); padding-left:8px; }
+.chips::-webkit-scrollbar { display:none; }
+.chips button[aria-pressed="true"] { color:var(--accent); background:var(--active); font-weight:600; }
+.iconbtn { display:grid; place-items:center; width:34px; height:32px; padding:0; flex:none; }
+
+.tape { flex:none; overflow:hidden; min-height:46px; }
+.info { flex:none; padding:4px 6px; min-height:90px; }
+.chart { flex:1 1 auto; min-height:420px; overflow:hidden; position:relative; }
+.tradingview-widget-container { height:100%; width:100%; }
+.foot { flex:none; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:11.5px; padding:0 4px; }
+.foot a { color:var(--accent); }
+.fallback { position:absolute; inset:0; display:grid; place-items:center; padding:24px; text-align:center; color:var(--muted); line-height:1.6; }
+
+@media (max-width: 760px) {
+  html, body { height:auto; }
+  .brand span { display:none; }
+  .chart { flex:none; height:78vh; min-height:480px; }
+}
+</style>
+</head>
+<body>
+<header class="top panel">
+  <div class="brand">
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="7" width="4" height="9" rx="1" fill="#12a37a"/><rect x="3.5" y="4" width="1" height="14" fill="#12a37a"/><rect x="8" y="4" width="4" height="7" rx="1" fill="#e0444e"/><rect x="9.5" y="2" width="1" height="12" fill="#e0444e"/><rect x="14" y="5" width="4" height="10" rx="1" fill="var(--accent)"/><rect x="15.5" y="3" width="1" height="15" fill="var(--accent)"/></svg>
+    <span>Market View</span>
+  </div>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="chips" id="chips" role="group" aria-label="종목"></div>
+  <button class="iconbtn" id="themeBtn" aria-label="밝은/어두운 테마 전환" title="테마 전환"></button>
+</header>
+
+<div class="tape panel" id="tape"></div>
+<div class="info panel" id="info"></div>
+<main class="chart panel" id="chart">
+  <div class="fallback" id="fallback" hidden>트레이딩뷰 위젯을 불러오지 못했습니다.<br>인터넷 연결을 확인하거나, 이 파일을 크롬·사파리 같은 일반 브라우저에서 열어 주세요.<br>(Claude 아티팩트 화면 안에서는 외부 위젯이 막혀 있습니다.)</div>
+</main>
+
+<footer class="foot">
+  <span>차트와 시세는 <a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView</a> 위젯이 제공합니다. 거래소에 따라 시세가 지연될 수 있습니다.</span>
+  <span>차트 안에서 종목 검색, 지표, 그리기 도구를 쓸 수 있습니다.</span>
+</footer>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const GROUPS = {
+  coin: { label:'코인', items:[
+    ['BINANCE:BTCUSDT', '비트코인'], ['BINANCE:ETHUSDT', '이더리움'], ['BINANCE:SOLUSDT', '솔라나'], ['BINANCE:XRPUSDT', '리플'],
+    ['BINANCE:BNBUSDT', 'BNB'], ['BINANCE:DOGEUSDT', '도지코인'], ['UPBIT:BTCKRW', '비트코인(원화)'] ] },
+  us: { label:'미국', items:[
+    ['NASDAQ:AAPL', '애플'], ['NASDAQ:NVDA', '엔비디아'], ['NASDAQ:MSFT', '마이크로소프트'], ['NASDAQ:TSLA', '테슬라'],
+    ['NASDAQ:AMZN', '아마존'], ['NASDAQ:GOOGL', '알파벳'], ['NASDAQ:META', '메타'] ] },
+  kr: { label:'한국', items:[
+    ['KRX:005930', '삼성전자'], ['KRX:000660', 'SK하이닉스'], ['KRX:035420', 'NAVER'], ['KRX:035720', '카카오'],
+    ['KRX:005380', '현대차'], ['KRX:373220', 'LG에너지솔루션'], ['KRX:KOSPI', '코스피'] ] },
+  idx: { label:'지수·환율', items:[
+    ['NASDAQ:IXIC', '나스닥 종합'], ['NASDAQ:NDX', '나스닥 100'], ['SP:SPX', 'S&P 500'], ['FX_IDC:USDKRW', '달러/원'],
+    ['OANDA:XAUUSD', '금'], ['TVC:DXY', '달러 인덱스'] ] },
+};
+const WATCH = ['BINANCE:BTCUSDT', 'BINANCE:ETHUSDT', 'NASDAQ:AAPL', 'NASDAQ:NVDA', 'NASDAQ:TSLA', 'KRX:005930', 'KRX:000660', 'NASDAQ:IXIC', 'SP:SPX', 'FX_IDC:USDKRW', 'OANDA:XAUUSD'];
+const TAPE = [['BINANCE:BTCUSDT', '비트코인'], ['BINANCE:ETHUSDT', '이더리움'], ['NASDAQ:IXIC', '나스닥'], ['SP:SPX', 'S&P 500'], ['KRX:KOSPI', '코스피'],
+  ['KRX:005930', '삼성전자'], ['NASDAQ:NVDA', '엔비디아'], ['NASDAQ:AAPL', '애플'], ['FX_IDC:USDKRW', '달러/원'], ['OANDA:XAUUSD', '금']];
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('mview.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('mview.' + k, JSON.stringify(v)); } catch (e) {} },
+};
+const state = Object.assign({ group:'coin', symbol:'BINANCE:BTCUSDT', theme:matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' }, store.get('prefs', {}));
+if (!GROUPS[state.group]) state.group = 'coin';
+const save = () => store.set('prefs', state);
+
+// 트레이딩뷰 공식 임베드 위젯을 컨테이너에 붙인다 (설정은 스크립트 본문 JSON으로 전달)
+function mount(host, name, cfg) {
+  host.querySelectorAll('.tradingview-widget-container').forEach(e => e.remove());
+  const box = document.createElement('div'); box.className = 'tradingview-widget-container';
+  const w = document.createElement('div'); w.className = 'tradingview-widget-container__widget'; w.style.height = '100%';
+  const s = document.createElement('script');
+  s.src = `https://s3.tradingview.com/external-embedding/embed-widget-${name}.js`; s.async = true;
+  s.text = JSON.stringify(cfg);
+  s.onerror = () => { $('fallback').hidden = false; };
+  box.append(w, s); host.append(box);
+}
+function renderTape() {
+  mount($('tape'), 'ticker-tape', { symbols:TAPE.map(([proName, title]) => ({ proName, title })), showSymbolLogo:true, isTransparent:true, displayMode:'adaptive', colorTheme:state.theme, locale:'kr' });
+}
+function renderInfo() {
+  mount($('info'), 'symbol-info', { symbol:state.symbol, width:'100%', locale:'kr', colorTheme:state.theme, isTransparent:true });
+}
+function renderChart() {
+  mount($('chart'), 'advanced-chart', {
+    autosize:true, symbol:state.symbol, interval:'60', timezone:'Asia/Seoul', theme:state.theme, style:'1', locale:'kr',
+    allow_symbol_change:true, withdateranges:true, hide_side_toolbar:false, details:true, hotlist:false, calendar:false,
+    watchlist:WATCH, support_host:'https://www.tradingview.com',
+  });
+}
+
+function renderTabs() {
+  $('tabs').innerHTML = Object.entries(GROUPS).map(([k, g]) => `<button role="tab" data-g="${k}" aria-selected="${k === state.group}">${g.label}</button>`).join('');
+  $('chips').innerHTML = GROUPS[state.group].items.map(([sym, name]) => `<button data-s="${sym}" title="${sym}" aria-pressed="${sym === state.symbol}">${name}</button>`).join('');
+}
+$('tabs').addEventListener('click', e => { const b = e.target.closest('[data-g]'); if (!b) return; state.group = b.dataset.g; save(); renderTabs(); });
+$('chips').addEventListener('click', e => {
+  const b = e.target.closest('[data-s]'); if (!b || b.dataset.s === state.symbol) return;
+  state.symbol = b.dataset.s; save(); renderTabs(); renderInfo(); renderChart();
+});
+
+const SUN = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="3.2"/><path d="M9 1.5v1.8M9 14.7v1.8M1.5 9h1.8M14.7 9h1.8M3.7 3.7L5 5M13 13l1.3 1.3M3.7 14.3L5 13M13 5l1.3-1.3"/></svg>';
+const MOON = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 11.2A6 6 0 016.8 3.5a6 6 0 107.7 7.7z"/></svg>';
+function applyTheme() {
+  document.documentElement.dataset.theme = state.theme;
+  $('themeBtn').innerHTML = state.theme === 'dark' ? SUN : MOON;
+}
+$('themeBtn').addEventListener('click', () => {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); renderTape(); renderInfo(); renderChart();
+});
+
+applyTheme(); renderTabs(); renderTape(); renderInfo(); renderChart();
+})();
+</script>
+</body>
+</html>
