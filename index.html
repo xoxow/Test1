@@ -370,15 +370,16 @@ button, select, input { font:inherit; color:inherit; }
         <p>BTCUSDT, ETHUSDT, SOLUSDT. 키 없이 연결되며, 가격과 현재 봉이 웹소켓으로 실시간 갱신됩니다.</p>
       </div>
       <div class="srcbox">
-        <h4>나스닥 · Twelve Data <span class="st" id="stTd"></span></h4>
-        <p>IXIC(나스닥 종합지수), NDX(나스닥 100). 무료 API 키가 필요합니다. <span class="mono-sel">twelvedata.com</span>에서 가입하면 대시보드에서 키를 받을 수 있습니다. 무료 요금제는 분당 8회, 하루 800회까지라서 장중에는 2분마다 갱신하고, 시세가 거래소보다 늦을 수 있습니다. 키는 이 브라우저에만 저장됩니다.</p>
+        <h4>미국 주식·지수 · Twelve Data <span class="st" id="stTd"></span></h4>
+        <p>나스닥 종합(IXIC), 나스닥 100(NDX), S&amp;P 500(SPX), 애플(AAPL), 엔비디아(NVDA), 마이크로소프트(MSFT), 테슬라(TSLA). 무료 API 키가 필요합니다. <span class="mono-sel">twelvedata.com</span>에서 가입하면 대시보드에서 키를 받을 수 있습니다.</p>
+        <p>무료 한도(분당 8회, 하루 800회)에 맞춰 장중에는 보고 있는 종목을 2분마다, 나머지는 10분마다 갱신합니다. 시세는 실제보다 늦을 수 있습니다. 키는 이 브라우저에만 저장됩니다.</p>
         <form id="tdForm">
           <input id="tdKeyIn" type="password" placeholder="Twelve Data API 키" autocomplete="off" spellcheck="false" aria-label="Twelve Data API 키">
           <button class="btn-primary" type="submit">저장하고 연결</button>
           <button class="btn-ghost" type="button" id="tdClear">키 삭제</button>
         </form>
       </div>
-      <p style="margin:0;color:var(--muted);font-size:12px;line-height:1.55">그 밖의 종목(애플, 삼성전자, 코스피, 환율 등)은 시뮬레이션 데이터이며, 화면에 SIM으로 표시됩니다.</p>
+      <p style="margin:0;color:var(--muted);font-size:12px;line-height:1.55">그 밖의 종목(삼성전자, SK하이닉스, NAVER, 코스피, 환율, 금)은 시뮬레이션 데이터이며, 화면에 SIM으로 표시됩니다.</p>
     </div>
   </div>
 </div>
@@ -442,15 +443,15 @@ const SYMBOLS = [
   { s:'DOGEUSDT', n:'도지코인 / 테더',      t:'crypto', x:'BINANCE', p:0.16,  v:.050, d:5, vb:1.0e9, src:'binance' },
   { s:'IXIC',   n:'나스닥 종합지수',         t:'index',  x:'NASDAQ', p:19060,  v:.011, d:2, vb:0, src:'twelve' },
   { s:'NDX',    n:'나스닥 100 지수',         t:'index',  x:'NASDAQ', p:20150,  v:.011, d:2, vb:0, src:'twelve' },
-  { s:'AAPL',   n:'Apple Inc.',             t:'stock',  x:'NASDAQ', p:228.4,  v:.014, d:2, vb:5.2e7 },
-  { s:'NVDA',   n:'NVIDIA Corporation',     t:'stock',  x:'NASDAQ', p:134.8,  v:.027, d:2, vb:2.4e8 },
-  { s:'MSFT',   n:'Microsoft Corporation',  t:'stock',  x:'NASDAQ', p:418.2,  v:.013, d:2, vb:2.1e7 },
-  { s:'TSLA',   n:'Tesla, Inc.',            t:'stock',  x:'NASDAQ', p:251.2,  v:.033, d:2, vb:9.0e7 },
+  { s:'AAPL',   n:'Apple Inc.',             t:'stock',  x:'NASDAQ', p:228.4,  v:.014, d:2, vb:5.2e7, src:'twelve' },
+  { s:'NVDA',   n:'NVIDIA Corporation',     t:'stock',  x:'NASDAQ', p:134.8,  v:.027, d:2, vb:2.4e8, src:'twelve' },
+  { s:'MSFT',   n:'Microsoft Corporation',  t:'stock',  x:'NASDAQ', p:418.2,  v:.013, d:2, vb:2.1e7, src:'twelve' },
+  { s:'TSLA',   n:'Tesla, Inc.',            t:'stock',  x:'NASDAQ', p:251.2,  v:.033, d:2, vb:9.0e7, src:'twelve' },
   { s:'005930', n:'삼성전자',                t:'stock',  x:'KRX',    p:71800,  v:.016, d:0, vb:1.3e7 },
   { s:'000660', n:'SK하이닉스',              t:'stock',  x:'KRX',    p:182500, v:.024, d:0, vb:3.1e6 },
   { s:'035420', n:'NAVER',                  t:'stock',  x:'KRX',    p:168500, v:.020, d:0, vb:6.0e5 },
   { s:'KOSPI',  n:'코스피 종합지수',          t:'index',  x:'KRX',    p:2598.3, v:.009, d:2, vb:0 },
-  { s:'SPX',    n:'S&P 500 지수',            t:'index',  x:'INDEX',  p:5718.6, v:.008, d:2, vb:0 },
+  { s:'SPX',    n:'S&P 500 지수',            t:'index',  x:'INDEX',  p:5718.6, v:.008, d:2, vb:0, src:'twelve' },
   { s:'USDKRW', n:'미국 달러 / 대한민국 원',  t:'fx',     x:'FX',     p:1381.5, v:.004, d:2, vb:0 },
   { s:'EURUSD', n:'유로 / 미국 달러',         t:'fx',     x:'FX',     p:1.0842, v:.005, d:4, vb:0 },
   { s:'XAUUSD', n:'금 / 미국 달러',           t:'commodity', x:'OTC', p:2655.4, v:.009, d:2, vb:0 },
@@ -595,7 +596,19 @@ async function binance(path) {
   throw err;
 }
 const fromBin = k => ({ time:Math.floor(k[0] / 1000) + TZ, open:+k[1], high:+k[2], low:+k[3], close:+k[4], volume:+k[5] });
-async function twelve(path) {
+// 무료 한도(분당 8크레딧)를 넘지 않도록 요청을 줄 세운다. 묶음 요청은 종목 수만큼 크레딧을 쓴다.
+const tdUsed = [];
+async function tdSlot(n) {
+  for (;;) {
+    const now = Date.now();
+    while (tdUsed.length && now - tdUsed[0] > 61000) tdUsed.shift();
+    if (tdUsed.length + n <= 8) { for (let i = 0; i < n; i++) tdUsed.push(now); return; }
+    if (!$('loading').hidden) $('loadingTxt').textContent = '무료 요청 한도(분당 8회)에 걸려 잠시 기다리는 중 · 최대 1분';
+    await new Promise(r => setTimeout(r, 61000 - (now - tdUsed[0]) + 100));
+  }
+}
+async function twelve(path, credits = 1) {
+  await tdSlot(Math.min(8, credits));
   const j = await getJSON(`https://api.twelvedata.com${path}${path.includes('?') ? '&' : '?'}apikey=${encodeURIComponent(tdKey)}`);
   if (j && j.status === 'error') { const e = new Error(j.message || 'Twelve Data 오류'); e.code = j.code; throw e; }
   return j;
@@ -677,27 +690,42 @@ function onKline(k, sk) {
 }
 
 // Twelve Data: 장중 2분, 장 마감 중 30분 간격으로 시세 확인 (무료 한도 안에서)
-let tdLast = 0;
+let tdLastAll = 0, tdLastActive = 0;
+const qinfo = {};
 function applyQuote(sk, q) {
-  if (!q || q.status === 'error' || q.close == null || feed[sk] === 'sim') return;
+  if (!q || q.status === 'error' || q.close == null || feed[sk] === 'sim') return false;
   const p = +q.close; price[sk] = p;
   if (q.previous_close != null) prevClose[sk] = +q.previous_close;
+  const w = q.fifty_two_week || {};
+  qinfo[sk] = { open:+q.open, high:+q.high, low:+q.low, volume:+(q.volume || 0), h52:+w.high || null, l52:+w.low || null, at:Date.now() };
   feed[sk] = q.is_market_open ? 'live' : 'closed';
   const t = (+q.timestamp || Math.floor(Date.now() / 1000)) + TZ;
   for (const tfk of Object.keys(TF)) { const key = sk + '|' + tfk; if (loadedAt[key] && cache[key]) bump(cache[key], TF[tfk].s, p, t); }
   if (sk === state.sym) scheduleLive();
+  return true;
 }
+async function quoteBatch(list) {
+  const j = await twelve(`/quote?symbol=${list.map(s => s.s).join(',')}`, list.length);
+  const errs = [];
+  list.forEach(s => { const q = list.length === 1 ? j : j[s.s]; if (!applyQuote(s.s, q)) errs.push(`${s.s}: ${(q && q.message) || '시세 없음'}`); });
+  return errs;
+}
+// 장중: 보고 있는 종목 2분, 전체 10분 / 장 마감: 보고 있는 종목 30분, 전체 3시간
+let tdBusy = false;
 async function pollTwelve(force) {
   const ts = SYMBOLS.filter(s => s.src === 'twelve' && isLive(s.s));
-  if (!ts.length || !tdKey || (document.hidden && !force)) return;
-  const open = ts.some(s => feed[s.s] === 'live');
-  if (!force && Date.now() - tdLast < (open ? 120e3 : 1800e3)) return;
-  tdLast = Date.now();
+  if (!ts.length || !tdKey || tdBusy || (document.hidden && !force)) return;
+  const open = ts.some(s => feed[s.s] === 'live'), now = Date.now(), act = BY[state.sym];
+  let list = null;
+  if (force || now - tdLastAll >= (open ? 10 * 60e3 : 3 * 3600e3)) { list = ts; tdLastAll = tdLastActive = now; }
+  else if (act.src === 'twelve' && isLive(act.s) && now - tdLastActive >= (feed[act.s] === 'live' ? 120e3 : 1800e3)) { list = [act]; tdLastActive = now; }
+  if (!list) return;
+  tdBusy = true;
   try {
-    const j = await twelve(`/quote?symbol=${ts.map(s => s.s).join(',')}`);
-    if (ts.length === 1) applyQuote(ts[0].s, j); else ts.forEach(s => applyQuote(s.s, j[s.s]));
+    await quoteBatch(list);
     tdStatus = ts.some(s => feed[s.s] === 'live') ? '장중' : '장 마감';
   } catch (e) { tdStatus = '갱신 실패: ' + e.message; }
+  finally { tdBusy = false; }
   paintConn();
 }
 setInterval(() => pollTwelve(false), 30000);
@@ -738,14 +766,19 @@ async function initTwelve() {
   ts.forEach(s => { Object.keys(TF).forEach(t => delete loadedAt[s.s + '|' + t]); });
   if (!tdKey) { ts.forEach(s => feed[s.s] = 'sim'); tdStatus = 'API 키 필요'; return; }
   if (blocked) { ts.forEach(s => feed[s.s] = 'sim'); tdStatus = '연결 불가'; return; }
-  ts.forEach(s => feed[s.s] = 'loading'); tdStatus = '연결 중'; paintConn();
-  const errs = [];
-  for (const s of ts) {
-    try { const d = await loadHistory(s.s, 'D'); prevClose[s.s] = d[d.length - 2].close; price[s.s] = d[d.length - 1].close; feed[s.s] = 'closed'; }
-    catch (e) { feed[s.s] = 'sim'; errs.push(`${s.s}: ${e.message}`); if (e.network) { tdStatus = '연결 불가'; } }
-  }
-  if (errs.length) tdStatus = errs.join(' · ');
-  else { tdStatus = '연결됨'; await pollTwelve(true); }
+  ts.forEach(s => feed[s.s] = 'closed'); tdStatus = '연결 중'; paintConn();
+  try {
+    tdBusy = true;
+    const errs = await quoteBatch(ts);
+    tdLastAll = tdLastActive = Date.now();
+    ts.forEach(s => { if (!qinfo[s.s]) feed[s.s] = 'sim'; });
+    const ok = ts.filter(s => isLive(s.s)).length;
+    tdStatus = !ok ? '연결 실패' : ts.some(s => feed[s.s] === 'live') ? '장중' : '장 마감';
+    if (errs.length) tdStatus += ` (${ok}/${ts.length}종목 · ${errs[0]})`;
+  } catch (e) {
+    ts.forEach(s => feed[s.s] = 'sim');
+    tdStatus = e.network ? '연결 불가' : '오류: ' + e.message;
+  } finally { tdBusy = false; }
 }
 
 function badgeOf(sk) {
@@ -1577,7 +1610,12 @@ function updateWatch() {
 function updateDetail() {
   const s = BY[state.sym], p = price[s.s], pc = prevClose[s.s], ch = p - pc, cls = ch >= 0 ? 'up' : 'down';
   const d = cache[s.s + '|D']; if (!isLive(s.s)) catchUp(s.s, 'D', d);
-  const today = d[d.length - 1], yr = d.slice(-252), hi = Math.max(...yr.map(b => b.high)), lo = Math.min(...yr.map(b => b.low));
+  let today = d[d.length - 1], yr = d.slice(-252), hi = Math.max(...yr.map(b => b.high)), lo = Math.min(...yr.map(b => b.low));
+  const qi = qinfo[s.s];
+  if (s.src === 'twelve' && isLive(s.s) && qi && !loadedAt[s.s + '|D']) {
+    today = { open:qi.open, high:Math.max(qi.high, p), low:Math.min(qi.low, p), volume:qi.volume };
+    if (qi.h52 && qi.l52) { hi = Math.max(qi.h52, p); lo = Math.min(qi.l52, p); }
+  }
   $('dSym').textContent = s.s; $('dEx').textContent = s.x; $('dName').textContent = s.n;
   $('dLast').textContent = fmt(p, s.d); $('dLast').className = 'big num ' + cls;
   $('dChg').innerHTML = `<span class="${cls}">${sign(ch)}${fmt(Math.abs(ch), s.d)} (${sign(ch)}${Math.abs(ch / pc * 100).toFixed(2)}%)</span>`;
@@ -1703,7 +1741,7 @@ requestAnimationFrame(render);
     savePrefs(); renderAlerts(); refreshAlertLines();
   }
   if (blocked) toast('<b>외부 시세 서버에 연결할 수 없습니다</b>시뮬레이션 데이터로 표시합니다. 상단의 연결 상태를 누르면 자세한 내용을 볼 수 있습니다.', 7000);
-  else if (!tdKey) toast('<b>비트코인은 실시간으로 연결됐습니다</b>나스닥 시세는 상단의 연결 상태에서 무료 API 키를 넣으면 연결됩니다.', 7000);
+  else if (!tdKey) toast('<b>비트코인은 실시간으로 연결됐습니다</b>미국 주식·지수는 상단의 연결 상태에서 무료 API 키를 넣으면 연결됩니다.', 7000);
 })();
 
 $('dataBtn').addEventListener('click', () => { $('tdKeyIn').value = tdKey; openModal('dataModal'); paintConn(); });
@@ -1711,7 +1749,7 @@ $('tdForm').addEventListener('submit', async e => {
   e.preventDefault(); tdKey = $('tdKeyIn').value.trim(); store.set('tdkey', tdKey);
   await initTwelve(); paintConn(); updateWatch();
   if (BY[state.sym].src === 'twelve') await switchTo({}, false);
-  toast(/연결됨|장/.test(tdStatus) ? '<b>나스닥 시세를 연결했습니다</b>IXIC · NDX' : `<b>나스닥 연결 실패</b>${esc(tdStatus)}`, 6000);
+  toast(/장중|장 마감/.test(tdStatus) ? '<b>미국 주식·지수 시세를 연결했습니다</b>IXIC · NDX · SPX · AAPL · NVDA · MSFT · TSLA' : `<b>미국 주식 연결 실패</b>${esc(tdStatus)}`, 6000);
 });
 $('tdClear').addEventListener('click', async () => { tdKey = ''; $('tdKeyIn').value = ''; store.set('tdkey', ''); await initTwelve(); paintConn(); if (BY[state.sym].src === 'twelve') await switchTo({}, false); });
 })();
